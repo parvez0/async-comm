@@ -1,0 +1,29 @@
+# redis connection information
+redis:
+  host: localhost
+  port: 3306
+  username: ""
+  password: ""
+
+# logger configuration
+logger:
+  level: info
+  full_timestamp: true
+  output_file_path: ""
+
+# server information
+server:
+  app: App-A
+  routines:
+    - role: producer
+      q: req-q
+      name: producerA
+      message:
+        format: "{{.App}}-{{.Producer}}-{{.Time}}"
+        freq: '1000'
+    - role: consumer
+      q: resp-q
+      group: g1
+      name: consumerX
+      processing_time: 500
+      refreshTime: 5000
