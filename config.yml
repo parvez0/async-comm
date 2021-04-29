@@ -1,7 +1,7 @@
 # redis connection information
 redis:
   host: localhost
-  port: 3306
+  port: 6379
   username: ""
   password: ""
 
@@ -26,4 +26,4 @@ server:
       group: g1
       name: consumerX
       processing_time: 500
-      refreshTime: 5000
+      refresh_time: 5000

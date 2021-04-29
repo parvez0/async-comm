@@ -53,6 +53,12 @@ func (r *Redis) Close()  {
 	r.RdbCon.Close()
 }
 
+// Set will provide a way to set a key in redis
+func (r *Redis) Set(key, value string, expiry time.Duration) (string, error) {
+	status := r.RdbCon.Set(r.Ctx, key, value, expiry)
+	return status.Result()
+}
+
 // Produce will push the message to stream for the consumers
 func (r *Redis) Produce(qName, msg string) error {
 	args := &redis.XAddArgs{
@@ -72,7 +78,7 @@ func (r *Redis) Produce(qName, msg string) error {
 // messages on a particular stream, this consumer start
 // consuming the latest message which are available to it
 // and after it's done consuming it should ack the message
-// by calling r.ack(). It also take cares of verifying the
+// by calling Ack(). It also take cares of verifying the
 // alive consumers and rescheduling of pending messages
 // using r.syncConsumers in every RsyncTime interval
 func (r *Redis) Consume(ch chan Packet, ru Routine) {
@@ -108,23 +114,23 @@ func (r *Redis) Consume(ch chan Packet, ru Routine) {
 	}
 }
 
-// ack used to acknowledge a message upon successful
+// Ack used to acknowledge a message upon successful
 // consumption if the message is not ack it will go
 // into pending state where it will be reschedule to
 // other consumers through syncConsumers
-func (r *Redis) ack(ru Routine, retry int, msgId... string)  {
+func (r *Redis) Ack(ru Routine, retry int, msgId... string) error {
 	xack := r.RdbCon.XAck(r.Ctx, ru.Q, ru.Group, msgId...)
 	res, err := xack.Result()
 	if err != nil {
-		log.Errorf("failed acknowledge : %v - %s", msgId, err.Error())
+		log.Debugf("failed acknowledge : %v - %s", msgId, err.Error())
 		if retry < 3 {
-			r.ack(ru, retry + 1, msgId...)
-			return
+			return r.Ack(ru, retry + 1, msgId...)
 		}
 		log.Debugf("too many ack retries for messages - %v", msgId)
-		return
+		return err
 	}
 	log.Debugf("message acknowledge successfully for message %v - res : %d", msgId, res)
+	return nil
 }
 
 // syncConsumers fetches all the pending messages in
@@ -138,6 +144,11 @@ func (r *Redis) syncConsumers() {
 
 // onConnect inform us if the connection is successfully established
 func onConnect(ctx context.Context, conn *redis.Conn) error {
-	log.Info("redis connection established clientId: ", conn.ClientID(ctx))
+	init := conn.ClientID(ctx)
+	id, err := init.Result()
+	if err != nil {
+		log.Panicf("redis connection failed - please verify your connection string %s \nerror: %s", conn.String(), err.Error())
+	}
+	log.Info("redis connection established clientId: ", id)
 	return nil
 }
