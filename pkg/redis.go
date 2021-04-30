@@ -60,18 +60,19 @@ func (r *Redis) Set(key, value string, expiry time.Duration) (string, error) {
 }
 
 // Produce will push the message to stream for the consumers
-func (r *Redis) Produce(qName, msg string) error {
+func (r *Redis) Produce(qName, msg string) (string, error) {
 	args := &redis.XAddArgs{
 		Stream:       qName,
-		Values:       msg,
+		Values:       map[string]string{ "message": msg },
+		ID: 		  "*",
 	}
 	xadd := r.RdbCon.XAdd(r.Ctx, args)
 	res, err := xadd.Result()
 	if err != nil {
-		return err
+		return "", err
 	}
 	log.Debugf("message pushed to stream %s - res : %s", msg, res)
-	return nil
+	return res, nil
 }
 
 // Consume runs in a infinite loop to check for incoming
@@ -81,7 +82,7 @@ func (r *Redis) Produce(qName, msg string) error {
 // by calling Ack(). It also take cares of verifying the
 // alive consumers and rescheduling of pending messages
 // using r.syncConsumers in every RsyncTime interval
-func (r *Redis) Consume(ch chan Packet, ru Routine) {
+func (r *Redis) Consume(ru Routine) ([]redis.XStream, error) {
 	args := redis.XReadGroupArgs{
 		Group:     ru.Group,
 		Consumer:  ru.Name,
@@ -89,29 +90,8 @@ func (r *Redis) Consume(ch chan Packet, ru Routine) {
 		Count:     1,
 		NoAck:     false,
 	}
-	for {
-		if time.Now().After(r.RsyncTime) {
-			r.syncConsumers()
-			r.RsyncTime = time.Now().Add(time.Duration(ru.RefreshTime) * time.Millisecond)
-		}
-		cmd := r.RdbCon.XReadGroup(r.Ctx, &args)
-		res, err := cmd.Result()
-		if err != nil {
-			log.Errorf("failed to read messages - %s, trying again", err.Error())
-			continue
-		}
-		log.Debug("message received from redis - ", res)
-		time.Sleep(time.Duration(ru.ProcessingTime) * time.Millisecond)
-		for _, v := range res {
-			for _, msg := range v.Messages {
-				pkt := Packet{
-					Message: msg.Values,
-					Id:      msg.ID,
-				}
-				ch <- pkt
-			}
-		}
-	}
+	cmd := r.RdbCon.XReadGroup(r.Ctx, &args)
+	return cmd.Result()
 }
 
 // Ack used to acknowledge a message upon successful
@@ -140,6 +120,55 @@ func (r *Redis) Ack(ru Routine, retry int, msgId... string) error {
 // by this consumer to claim that message using XClaim
 func (r *Redis) syncConsumers() {
 	
+}
+
+// GrpExits verifies if provided group exits or not
+// it also verifies that the stream we are connecting
+// exits if not it will return an error
+func (r *Redis) GrpExits(q, grp string) (bool, error) {
+	cmd := r.RdbCon.XInfoGroups(r.Ctx, q)
+	info, err := cmd.Result()
+	if err != nil {
+		return false, err
+	}
+	for _, v := range info {
+		if v.Name == grp {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// CreateGrp creates a new group for provided stream
+func (r *Redis) CreateGrp(q, grp string) error {
+	cmd := r.RdbCon.XGroupCreate(r.Ctx, q, grp, "0")
+	sts, err := cmd.Result()
+	if err != nil {
+		return err
+	}
+	log.Infof("group '%s' for stream '%s' created: %s", grp, q, sts)
+	return nil
+}
+
+// DeleteGrp creates a new group for provided stream
+func (r *Redis) DeleteGrp(q, grp string) error {
+	cmd := r.RdbCon.XGroupDestroy(r.Ctx, q, grp)
+	sts, err := cmd.Result()
+	if err != nil {
+		return err
+	}
+	log.Infof("group '%s' for stream '%s' destroyed: %d", grp, q, sts)
+	return nil
+}
+
+func (r *Redis) DeleteStream(q string) error {
+	cmd := r.RdbCon.Del(r.Ctx, q)
+	sts, err := cmd.Result()
+	if err != nil {
+		return err
+	}
+	log.Infof("stream '%s' deleted: %d", q, sts)
+	return nil
 }
 
 // onConnect inform us if the connection is successfully established

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"os"
+	"path"
 	"sync"
 )
 
@@ -40,7 +41,7 @@ type Routine struct {
 	Message struct {
 		FormattedMsg string `json:"formatted_msg" mapstructure:"formatted_msg"`
 		Format string `json:"format" mapstructure:"format"`
-		Freq   string `json:"freq" mapstructure:"freq"`
+		Freq   int `json:"freq" mapstructure:"freq"`
 	} `json:"message,omitempty" mapstructure:"message"`
 	ProcessingTime int `json:"processing_time,omitempty" mapstructure:"processing_time"`
 	RefreshTime    int `json:"refresh_time,omitempty" mapstructure:"refresh_time"`
@@ -60,27 +61,32 @@ func InitializeConfig() *Config {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	// Set the file name of the configurations file
+	// set the file name of the configurations file
 	viper.SetConfigName("config")
 
-	// Set the path to look for the configurations file
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("/opt/server")
+	// getting home directory for config path
+	homeDir, _ := os.UserHomeDir()
 
-	// Enable VIPER to read Environment Variables
+	// set the path to look for the configurations file
+	viper.AddConfigPath(".")
+	viper.AddConfigPath(path.Join(homeDir, ".async_comm"))
+	viper.AddConfigPath("/etc/async-comm")
+	viper.AddConfigPath(os.Getenv("CONFIG_PATH"))
+
+	// enable VIPER to read Environment Variables
 	viper.AutomaticEnv()
 
 	viper.SetConfigType("yml")
 
 	if err := viper.ReadInConfig(); err != nil {
-		panic(fmt.Sprintf("error reading config file - %s", err))
+		fmt.Printf("error reading config file - %s\n", err)
+		os.Exit(1)
 	}
 
 	hostname, _ := os.Hostname()
 
 	// Set undefined variables
 	viper.SetDefault("server.app", hostname)
-	viper.SetDefault("pkg.port", "5000")
 	viper.SetDefault("db.host", "localhost")
 	viper.SetDefault("db.port", "3306")
 	viper.SetDefault("db.username", "")
