@@ -90,8 +90,8 @@ func InitializeConfig() *Config {
 	viper.SetDefault("db.host", "localhost")
 	viper.SetDefault("db.port", "3306")
 	viper.SetDefault("db.username", "")
-	viper.SetDefault("logger.level", "info")
-	viper.SetDefault("logger.full_timestamp", true)
+	viper.SetDefault("ac_logger.level", "info")
+	viper.SetDefault("ac_logger.full_timestamp", true)
 
 	err := viper.Unmarshal(&config)
 	if err != nil {

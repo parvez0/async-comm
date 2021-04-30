@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+// asyncomm
+// config
+// ac_logger
+
+rdb := redis.NewRdb(context.TODO(), cnf.Redis, log, 0)
+defer rdb.Close()
+
 func (a *App) InitializeApp(rdb *redis.Redis, log logger.Logger, cnf *config.Config)  {
 	a.Rdb = rdb
 	a.log = log
