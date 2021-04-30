@@ -1,4 +1,4 @@
-package pkg
+package config
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 // postgres db details including the credentials
 type Config struct {
 	Server ServerConf `json:"server" mapstructure:"server"`
-	Redis RedisConf `json:"redis" mapstructure:"redis"`
+	Redis  RedisConf  `json:"redis" mapstructure:"redis"`
 	Logger struct{
 		Level string `json:"level" mapstructure:"level"`
 		FullTimestamp bool `json:"full_timestamp" mapstructure:"full_timestamp"`
@@ -22,7 +22,7 @@ type Config struct {
 }
 
 type ServerConf struct {
-	App      string `json:"app" mapstructure:"app"`
+	App      string    `json:"app" mapstructure:"app"`
 	Routines []Routine `json:"routines" mapstructure:"routines"`
 }
 

@@ -1,6 +1,8 @@
-package pkg
+package redis
 
 import (
+	"async-comm/internal/app/asynccommtest/config"
+	"async-comm/internal/app/asynccommtest/logger"
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
@@ -12,6 +14,7 @@ type Redis struct {
 	RdbCon    *redis.Conn
 	Ctx       context.Context
 	RsyncTime time.Time
+	log       logger.Logger
 }
 
 // Packet defines the redis consumed messages
@@ -23,7 +26,7 @@ type Packet struct {
 // NewRdb initializes a new Redis instance and establishes a
 // connection with the redis server, it also manages the ctx
 // at a higher level to be used by all methods of Redis
-func NewRdb(ctx context.Context, rCnf RedisConf, rsyncInterval int) *Redis {
+func NewRdb(ctx context.Context, rCnf config.RedisConf, log logger.Logger, rsyncInterval int) *Redis {
 	// setting initial rsync time for clients
 	if rsyncInterval == 0 {
 		rsyncInterval = 5000
@@ -31,20 +34,21 @@ func NewRdb(ctx context.Context, rCnf RedisConf, rsyncInterval int) *Redis {
 	// Options contains all the information about setting up a
 	// persistent connection with the redis server.
 	redisOpts := redis.Options{
-		Addr:               fmt.Sprintf("%s:%s", rCnf.Host, rCnf.Port),
-		OnConnect:          onConnect,
-		MaxRetries:         5,
-		MinRetryBackoff:    250 * time.Millisecond,
-		MaxRetryBackoff:    1 * time.Second,
-		PoolSize:           10,
-		MinIdleConns:       3,
-		IdleTimeout:        2 * time.Minute,
+		Addr:            fmt.Sprintf("%s:%s", rCnf.Host, rCnf.Port),
+		OnConnect:       onConnect,
+		MaxRetries:      5,
+		MinRetryBackoff: 250 * time.Millisecond,
+		MaxRetryBackoff: 1 * time.Second,
+		PoolSize:        10,
+		MinIdleConns:    3,
+		IdleTimeout:     2 * time.Minute,
 	}
 	rdb := redis.NewClient(&redisOpts)
 	return &Redis{
 		RdbCon: rdb.Conn(ctx),
 		Ctx: ctx,
 		RsyncTime: time.Now().Add(time.Duration(rsyncInterval) * time.Millisecond),
+		log: log,
 	}
 }
 
@@ -71,7 +75,7 @@ func (r *Redis) Produce(qName, msg string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Debugf("message pushed to stream %s - res : %s", msg, res)
+	r.log.Debugf("message pushed to stream %s - res : %s", msg, res)
 	return res, nil
 }
 
@@ -82,7 +86,7 @@ func (r *Redis) Produce(qName, msg string) (string, error) {
 // by calling Ack(). It also take cares of verifying the
 // alive consumers and rescheduling of pending messages
 // using r.syncConsumers in every RsyncTime interval
-func (r *Redis) Consume(ru Routine) ([]redis.XStream, error) {
+func (r *Redis) Consume(ru config.Routine) ([]redis.XStream, error) {
 	args := redis.XReadGroupArgs{
 		Group:     ru.Group,
 		Consumer:  ru.Name,
@@ -98,18 +102,18 @@ func (r *Redis) Consume(ru Routine) ([]redis.XStream, error) {
 // consumption if the message is not ack it will go
 // into pending state where it will be reschedule to
 // other consumers through syncConsumers
-func (r *Redis) Ack(ru Routine, retry int, msgId... string) error {
+func (r *Redis) Ack(ru config.Routine, retry int, msgId... string) error {
 	xack := r.RdbCon.XAck(r.Ctx, ru.Q, ru.Group, msgId...)
 	res, err := xack.Result()
 	if err != nil {
-		log.Debugf("failed acknowledge : %v - %s", msgId, err.Error())
+		r.log.Debugf("failed acknowledge : %v - %s", msgId, err.Error())
 		if retry < 3 {
 			return r.Ack(ru, retry + 1, msgId...)
 		}
-		log.Debugf("too many ack retries for messages - %v", msgId)
+		r.log.Debugf("too many ack retries for messages - %v", msgId)
 		return err
 	}
-	log.Debugf("message acknowledge successfully for message %v - res : %d", msgId, res)
+	r.log.Debugf("message acknowledge successfully for message %v - res : %d", msgId, res)
 	return nil
 }
 
@@ -146,7 +150,7 @@ func (r *Redis) CreateGrp(q, grp string) error {
 	if err != nil {
 		return err
 	}
-	log.Infof("group '%s' for stream '%s' created: %s", grp, q, sts)
+	r.log.Infof("group '%s' for stream '%s' created: %s", grp, q, sts)
 	return nil
 }
 
@@ -157,7 +161,7 @@ func (r *Redis) DeleteGrp(q, grp string) error {
 	if err != nil {
 		return err
 	}
-	log.Infof("group '%s' for stream '%s' destroyed: %d", grp, q, sts)
+	r.log.Infof("group '%s' for stream '%s' destroyed: %d", grp, q, sts)
 	return nil
 }
 
@@ -167,7 +171,7 @@ func (r *Redis) DeleteStream(q string) error {
 	if err != nil {
 		return err
 	}
-	log.Infof("stream '%s' deleted: %d", q, sts)
+	r.log.Infof("stream '%s' deleted: %d", q, sts)
 	return nil
 }
 
@@ -176,8 +180,8 @@ func onConnect(ctx context.Context, conn *redis.Conn) error {
 	init := conn.ClientID(ctx)
 	id, err := init.Result()
 	if err != nil {
-		log.Panicf("redis connection failed - please verify your connection string %s \nerror: %s", conn.String(), err.Error())
+		panic(fmt.Sprintf("redis connection failed - please verify your connection string %s \nerror: %s", conn.String(), err.Error()))
 	}
-	log.Info("redis connection established clientId: ", id)
+	fmt.Println("redis connection established clientId: ", id)
 	return nil
 }

@@ -1,7 +1,9 @@
-package pkg_test
+package redis_test
 
 import (
-	"async-comm/pkg"
+	"async-comm/internal/app/asynccommtest/config"
+	"async-comm/internal/app/asynccommtest/logger"
+	"async-comm/pkg/redis"
 	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
@@ -9,17 +11,17 @@ import (
 	"time"
 )
 
-var cnf *pkg.Config
-var rdb *pkg.Redis
+var cnf *config.Config
+var rdb *redis.Redis
 
 var Q = "test_queue"
 var Group = "test_group1"
 var Consumers = []string{"test_consumer1", "test_consumer2"}
 
 func Test_RedisConnection(t *testing.T) {
-	cnf = pkg.InitializeConfig()
-	pkg.InitializeLogger()
-	rdb = pkg.NewRdb(context.TODO(), cnf.Redis, 0)
+	cnf = config.InitializeConfig()
+	log := logger.InitializeLogger(cnf)
+	rdb = redis.NewRdb(context.TODO(), cnf.Redis, log,0)
 }
 
 func Test_RedisProducer(t *testing.T)  {
@@ -47,11 +49,11 @@ func Test_RedisConsumer(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		wrk := Consumers[i%2]
 		t.Run(fmt.Sprintf("%s_%d", wrk, i), func(t *testing.T) {
-			r := pkg.Routine{
-				Role:  "consumer",
-				Q:     Q,
-				Name:  wrk,
-				Group: Group,
+			r := config.Routine{
+				Role:           "consumer",
+				Q:              Q,
+				Name:           wrk,
+				Group:          Group,
 				ProcessingTime: 100,
 				RefreshTime:    1000,
 			}
