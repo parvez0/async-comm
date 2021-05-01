@@ -70,6 +70,10 @@ func TestInitializeConsumer(t *testing.T)  {
 }
 
 func TestDeleteQ(t *testing.T)  {
+	aclib, _ := asynccomm.NewAC(context.TODO(), asynccomm.AcOptions{})
+	cnf := src.InitializeConfig()
+	cnf.Logger.Level = LogLevel
+	a = src.NewApp(aclib, cnf, src.InitializeLogger(cnf))
 	err := a.DeleteQ(Q)
 	assert.Nil(t, err)
 }

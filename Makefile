@@ -9,6 +9,13 @@ build: system-check
 	@cd cmd/ && GOOS_VAL=$(shell go env GOOS) GOARCH_VAL=$(shell go env GOARCH) go build -ldflags="-X main.BuildVersion=$(DEVELOPMENT_TAG)" -o $(BUILD_PATH) main.go
 	@echo "build successful"
 
+docker-build: docker-check
+	@docker build -t parvez0/asynccomm -f build/package/asynccommtest/Dockerfile .
+
+docker-check:
+	@echo "verifying docker installation"
+	@if [ -z "$(shell docker -v 2> /dev/null)" ]; then echo "docker is not installed or not running"; exit 1; fi
+
 install: system-check
 	@if [ ! -f $(BUILD_PATH) ] ; then echo "binaries does not exits at $(BUILD_PATH)"; exit 1; fi;
 	@if [[ "$(shell go env GOOS)" == "darwin" ]]; then echo "copying binaries to install path" && sudo cp "${BUILD_PATH}" /usr/local/bin/; fi;
