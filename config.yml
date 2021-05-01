@@ -5,24 +5,39 @@ redis:
   username: ""
   password: ""
 
-# ac_logger configuration
-logger:
-  level: debug
+# act_app_logger configuration
+app_logger:
+  level: info
   full_timestamp: true
   output_file_path: ""
 
-# server information
-server:
+# ac library logger configuration
+ac_logger:
+  level: error
+  output_file_path: ""
+
+# application information
+application:
   app: App-A
   routines:
     - role: producer
-      q: req-q #group req-q-consumer-group
+      q: req-a-q #group req-q-consumer-group
       name: producerA
       message:
         format: "{{.App}}-{{.Producer}}-{{.Time}}"
-        freq: 1000
+        freq: 100
     - role: consumer
-      q: req-q
+      q: req-a-q
       name: consumerX
-      processing_time: 500
+      processing_time: 1000
+      refresh_time: 5000
+    - role: consumer
+      q: req-a-q
+      name: consumerY
+      processing_time: 1000
+      refresh_time: 5000
+    - role: consumer
+      q: req-a-q
+      name: consumerZ
+      processing_time: 1000
       refresh_time: 5000

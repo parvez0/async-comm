@@ -1,8 +1,7 @@
 package redis_test
 
 import (
-	"async-comm/internal/app/asynccommtest/config"
-	"async-comm/internal/app/asynccommtest/logger"
+	"async-comm/pkg/asynccomm/ac_logger"
 	"async-comm/pkg/redis"
 	"context"
 	"fmt"
@@ -11,17 +10,22 @@ import (
 	"time"
 )
 
-var cnf *config.Config
-var rdb *redis.Redis
+const (
+	Q = "test_queue"
+	Group = "test_group1"
+	RedisHost = ""
+	RedisPort = "6379"
+	LogLevel = "debug"
+)
 
-var Q = "test_queue"
-var Group = "test_group1"
-var Consumers = []string{"test_consumer1", "test_consumer2"}
+var (
+	rdb *redis.Redis
+	Consumers = []string{"test_consumer1", "test_consumer2"}
+)
 
 func Test_RedisConnection(t *testing.T) {
-	cnf = config.InitializeConfig()
-	log := logger.InitializeLogger(cnf)
-	rdb = redis.NewRdb(context.TODO(), cnf.Redis, log,0)
+	log, _ := ac_logger.InitializeLogger(LogLevel, "")
+	rdb = redis.NewRdb(context.TODO(), RedisHost, RedisPort,"", "", log)
 }
 
 func Test_RedisProducer(t *testing.T)  {
@@ -41,7 +45,7 @@ func Test_RedisCheckIfGroupExits(t *testing.T)  {
 }
 
 func Test_RedisCreateGroup(t *testing.T)  {
-	err := rdb.CreateGrp(Q, Group)
+	err := rdb.CreateGrp(Q, Group, "0")
 	assert.Nil(t, err)
 }
 
@@ -49,19 +53,11 @@ func Test_RedisConsumer(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		wrk := Consumers[i%2]
 		t.Run(fmt.Sprintf("%s_%d", wrk, i), func(t *testing.T) {
-			r := config.Routine{
-				Role:           "consumer",
-				Q:              Q,
-				Name:           wrk,
-				Group:          Group,
-				ProcessingTime: 100,
-				RefreshTime:    1000,
-			}
-			res, err := rdb.Consume(r)
+			res, id, err := rdb.Consume(context.TODO(), Q, Group, wrk)
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Logf("recieved response from queue %+v", res)
+			t.Logf("recieved response from queue { msg: %s, id: %s }", res, id)
 		})
 	}
 }

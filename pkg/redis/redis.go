@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"github.com/imdario/mergo"
+	"reflect"
 	"time"
 )
 
@@ -24,27 +26,36 @@ type Packet struct {
 // NewRdb initializes a new Redis instance and establishes a
 // connection with the redis server, it also manages the ctx
 // at a higher level to be used by all methods of Redis
-func NewRdb(ctx context.Context, host, port, username, password string, log ac_logger.Logger) *Redis {
-	// Options contains all the information about setting up a
-	// persistent connection with the redis server.
-	redisOpts := redis.Options{
-		Addr:            fmt.Sprintf("%s:%s", host, port),
-		OnConnect:       onConnect,
-		MaxRetries:      5,
-		MinRetryBackoff: 250 * time.Millisecond,
-		MaxRetryBackoff: 1 * time.Second,
-		PoolSize:        10,
-		MinIdleConns:    3,
-		IdleTimeout:     2 * time.Minute,
-		Username:		 username,
-		Password: 		 password,
+func NewRdbWithOpts(ctx context.Context, opts interface{}, log ac_logger.Logger) *Redis {
+	rdbOpts := &redis.Options{
+		Addr: ":6379",
+		PoolSize: 100,
+		ReadTimeout: 5 * time.Second,
+		MaxRetries: 3,
+		WriteTimeout: 5 * time.Second,
+		MinIdleConns: 3,
 	}
-	rdb := redis.NewClient(&redisOpts)
+	switch opts.(type) {
+	case redis.Options:
+		val := opts.(redis.Options)
+		mergo.Merge(rdbOpts, val)
+	case *redis.Options:
+		mergo.Merge(rdbOpts, opts.(*redis.Options))
+	default:
+		panic(fmt.Sprintf("type redis.Options required provided: %s", reflect.TypeOf(opts)))
+	}
+	rdbOpts.OnConnect = onConnect
+	rdb := redis.NewClient(rdbOpts)
 	return &Redis{
 		RdbCon: rdb.Conn(ctx),
 		Ctx: ctx,
 		Log: log,
 	}
+}
+
+func NewRdb(ctx context.Context, host, port, usr, pwd string, log ac_logger.Logger) *Redis {
+	opts := redis.Options{ Addr: fmt.Sprintf("%s:%s", host, port), Username: usr, Password: pwd }
+	return NewRdbWithOpts(ctx, opts, log)
 }
 
 // Close closes the redis connection when called
@@ -87,7 +98,8 @@ func (r *Redis) Produce(qName string, msg string) (string, error) {
 // by calling Ack(). It also take cares of verifying the
 // alive consumers and rescheduling of pending messages
 // using r.syncConsumers in every RsyncTime interval
-func (r *Redis) Consume(q, g, name string) ([]byte, string, error) {
+func (r *Redis) Consume(ctx context.Context, q, g, name string) ([]byte, string, error) {
+
 	args := redis.XReadGroupArgs{
 		Group:     g,
 		Consumer:  name,
@@ -95,7 +107,7 @@ func (r *Redis) Consume(q, g, name string) ([]byte, string, error) {
 		Count:     1,
 		NoAck:     false,
 	}
-	cmd := r.RdbCon.XReadGroup(r.Ctx, &args)
+	cmd := r.RdbCon.XReadGroup(ctx, &args)
 	res, err := cmd.Result()
 	if err != nil {
 		return nil, "", err

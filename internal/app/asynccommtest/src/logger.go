@@ -1,7 +1,6 @@
-package logger
+package src
 
 import (
-	"async-comm/internal/app/asynccommtest/config"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"os"
@@ -28,7 +27,7 @@ var log *logrus.Logger
 var mutex = sync.Mutex{}
 
 // NewLogger returns a logrus custom_logger object with prefilled options
-func InitializeLogger(config *config.Config) Logger {
+func InitializeLogger(config *Config) Logger {
 	if log != nil {
 		return log
 	}

@@ -46,7 +46,7 @@ func InitializeLogger(level, out_file_path string) (Logger, error) {
 	// setting custom_logger format to string
 	baseLogger.SetFormatter(&Formatter{
 		TimestampFormat: "2006-01-02 15:04:05",
-		LogFormat:       "[%lvl%]: %time% -- [ AsyncComm ] -- - %msg%",
+		LogFormat:       "[%lvl%]: %time% -- [ AsyncComm ] -- - %msg%\n",
 	})
 
 	// set to true for showing filename and line number from where custom_logger being called

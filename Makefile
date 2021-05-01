@@ -26,7 +26,7 @@ release-pre-check:
 
 run:
 	@echo "starting application"
-	@go run main.go
+	@go run internal/app/asynccommtest/main.go
 
 tag: update-readme
 	@echo "creating tag $(TAG)"
