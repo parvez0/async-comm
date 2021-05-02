@@ -38,9 +38,9 @@ func NewRdbWithOpts(ctx context.Context, opts interface{}, log ac_logger.Logger)
 	switch opts.(type) {
 	case redis.Options:
 		val := opts.(redis.Options)
-		mergo.Merge(rdbOpts, val)
+		mergo.Merge(rdbOpts, val, mergo.WithOverride)
 	case *redis.Options:
-		mergo.Merge(rdbOpts, opts.(*redis.Options))
+		mergo.Merge(rdbOpts, opts.(*redis.Options), mergo.WithOverride)
 	default:
 		panic(fmt.Sprintf("type redis.Options required provided: %s", reflect.TypeOf(opts)))
 	}

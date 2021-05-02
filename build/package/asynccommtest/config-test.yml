@@ -1,0 +1,33 @@
+# redis connection information
+redis:
+  host: localhost
+  port: 6379
+  username: ""
+  password: ""
+
+# act_app_logger configuration
+app_logger:
+  level: info
+  full_timestamp: true
+  output_file_path: ""
+
+# ac library logger configuration
+ac_logger:
+  level: error
+  output_file_path: ""
+
+# application information
+application:
+  app: App-B
+  routines:
+    - role: producer
+      q: req-a-q #group req-q-consumer-group
+      name: producerA
+      message:
+        format: "{{.App}}-{{.Producer}}-{{.Time}}"
+        freq: 1000
+    - role: consumer
+      q: req-a-q
+      name: consumerA
+      processing_time: 5000
+      refresh_time: 5000

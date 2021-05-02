@@ -9,12 +9,19 @@ build: system-check
 	@cd cmd/ && GOOS_VAL=$(shell go env GOOS) GOARCH_VAL=$(shell go env GOARCH) go build -ldflags="-X main.BuildVersion=$(DEVELOPMENT_TAG)" -o $(BUILD_PATH) main.go
 	@echo "build successful"
 
+compose-up: docker-check docker-compose-check
+	@docker-compose -f build/package/asynccommtest/docker-compose.yml  up
+
 docker-build: docker-check
 	@docker build -t parvez0/asynccomm -f build/package/asynccommtest/Dockerfile .
 
 docker-check:
 	@echo "verifying docker installation"
 	@if [ -z "$(shell docker -v 2> /dev/null)" ]; then echo "docker is not installed or not running"; exit 1; fi
+
+docker-compose-check:
+	@echo "verifying docker-compose installation"
+	@if [ -z "$(shell docker-compose -v 2> /dev/null)" ]; then echo "docker-compose is not installed"; exit 1; fi
 
 install: system-check
 	@if [ ! -f $(BUILD_PATH) ] ; then echo "binaries does not exits at $(BUILD_PATH)"; exit 1; fi;
