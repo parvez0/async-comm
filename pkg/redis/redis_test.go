@@ -1,11 +1,11 @@
 package redis_test
 
 import (
-	"asynccomm-lib/asynccomm/ac_logger"
-	"asynccomm-lib/redis"
 	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"kiran-anand14/async-comm/pkg/asynccomm/ac_logger"
+	"kiran-anand14/async-comm/pkg/redis"
 	"testing"
 	"time"
 )

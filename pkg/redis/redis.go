@@ -1,11 +1,11 @@
 package redis
 
 import (
-	"asynccomm-lib/asynccomm/ac_logger"
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/imdario/mergo"
+	"kiran-anand14/async-comm/pkg/asynccomm/ac_logger"
 	"reflect"
 	"time"
 )

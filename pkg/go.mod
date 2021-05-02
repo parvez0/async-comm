@@ -1,4 +1,4 @@
-module asynccomm-lib
+module kiran-anand14/async-comm/pkg
 
 go 1.16
 
