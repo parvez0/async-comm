@@ -1,7 +1,7 @@
 package src
 
 import (
-	"async-comm/pkg/asynccomm"
+	"asynccomm-lib/asynccomm"
 	"fmt"
 	"time"
 )

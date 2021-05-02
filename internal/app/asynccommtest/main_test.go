@@ -1,8 +1,8 @@
 package main_test
 
 import (
-	"async-comm/internal/app/asynccommtest/src"
-	"async-comm/pkg/asynccomm"
+	"asynccomm-app/asynccommtest/src"
+	"asynccomm-lib/asynccomm"
 	"context"
 	"github.com/stretchr/testify/assert"
 	"sync"
