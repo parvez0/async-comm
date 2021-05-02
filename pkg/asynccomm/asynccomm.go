@@ -1,8 +1,8 @@
 package asynccomm
 
 import (
-	"async-comm/pkg/asynccomm/ac_logger"
-	"async-comm/pkg/redis"
+	"asynccomm-lib/asynccomm/ac_logger"
+	"asynccomm-lib/redis"
 	"context"
 	"crypto/tls"
 	"fmt"

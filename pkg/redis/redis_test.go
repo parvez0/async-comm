@@ -1,8 +1,8 @@
 package redis_test
 
 import (
-	"async-comm/pkg/asynccomm/ac_logger"
-	"async-comm/pkg/redis"
+	"asynccomm-lib/asynccomm/ac_logger"
+	"asynccomm-lib/redis"
 	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"

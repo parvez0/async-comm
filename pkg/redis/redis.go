@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"async-comm/pkg/asynccomm/ac_logger"
+	"asynccomm-lib/asynccomm/ac_logger"
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"

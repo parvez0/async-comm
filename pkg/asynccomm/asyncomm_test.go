@@ -1,7 +1,7 @@
 package asynccomm_test
 
 import (
-	"async-comm/pkg/asynccomm"
+	"asynccomm-lib/asynccomm"
 	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
