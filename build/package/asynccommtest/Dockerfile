@@ -24,7 +24,6 @@ RUN addgroup --gid 101 app && \
 
 RUN mkdir -p /etc/async-comm && chown -R app:app /etc/async-comm
 VOLUME /etc/async-comm
-COPY ../../../config.yml /etc/async-comm
 
 # Run as Non Privileged user
 USER app
