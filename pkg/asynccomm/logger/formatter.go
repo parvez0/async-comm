@@ -1,4 +1,4 @@
-package ac_logger
+package logger
 
 import (
 	"github.com/sirupsen/logrus"

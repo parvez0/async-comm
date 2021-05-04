@@ -1,7 +1,7 @@
 package redis_test
 
 import (
-	"async-comm/pkg/asynccomm/ac_logger"
+	"async-comm/pkg/asynccomm/logger"
 	"async-comm/pkg/redis"
 	"context"
 	"fmt"
@@ -24,7 +24,7 @@ var (
 )
 
 func Test_RedisConnection(t *testing.T) {
-	log, _ := ac_logger.InitializeLogger(LogLevel, "")
+	log, _ := logger.InitializeLogger(LogLevel, "")
 	rdb = redis.NewRdb(context.TODO(), RedisHost, RedisPort,"", "", log)
 }
 

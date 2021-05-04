@@ -1,7 +1,7 @@
 package asynccomm
 
 import (
-	"async-comm/pkg/asynccomm/ac_logger"
+	"async-comm/pkg/asynccomm/logger"
 	"async-comm/pkg/redis"
 	"context"
 	"crypto/tls"
@@ -41,7 +41,7 @@ type LoggerOpts struct {
 
 type AsyncComm struct {
 	Rdb *redis.Redis
-	Log ac_logger.Logger
+	Log logger.Logger
 }
 
 // NewAC creates a asyncComm library instance for managing
@@ -56,7 +56,7 @@ func NewAC(ctx context.Context, opts AcOptions) (*AsyncComm, error) {
 	if opts.Redis == nil {
 		opts.Redis = &RedisOpts{ Port: "6379" }
 	}
-	log, err := ac_logger.InitializeLogger(opts.Logger.Level, opts.Logger.OutputFilePath)
+	log, err := logger.InitializeLogger(opts.Logger.Level, opts.Logger.OutputFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func NewACWithBrokerOptions(ctx context.Context, opts AcOptions) (*AsyncComm, er
 			OutputFilePath: "",
 		}
 	}
-	log, err := ac_logger.InitializeLogger(opts.Logger.Level, opts.Logger.OutputFilePath)
+	log, err := logger.InitializeLogger(opts.Logger.Level, opts.Logger.OutputFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func NewACWithBrokerOptions(ctx context.Context, opts AcOptions) (*AsyncComm, er
 // by default it's set to error, available log levels are debug,
 // info, error, panic
 func (ac *AsyncComm) SetLogLevel(level string) error {
-	log, err := ac_logger.SetLevel(level)
+	log, err := logger.SetLevel(level)
 	if err != nil {
 		return err
 	}
@@ -113,25 +113,12 @@ func (ac *AsyncComm) Ack(q string, msgId... string) error {
 
 func (ac *AsyncComm) CreateQ(q string) error {
 	grp := q + DefaultConsumerGroup
-	exits := ac.Rdb.StreamExits(q)
-	if !exits {
-		// code for creating the q should go here
-		ac.Rdb.Produce(q, "initial message")
-	}
-	exits, err := ac.Rdb.GrpExits(q, grp)
-	if err != nil {
-		ac.Log.Debugf("failed to verify if group exits with err : %s", err.Error())
-		return err
-	}
-	if !exits {
-		return ac.Rdb.CreateGrp(q, grp, "$")
-	}
-	return nil
+	return ac.Rdb.CreateGrp(q, grp, "$")
 }
 
 func (ac *AsyncComm) ClaimPendingMessages(q, consumer string) error {
 	grp := q + DefaultConsumerGroup
-	msgs, err := ac.Rdb.PendingStreamMessages(q, grp)
+	msgs, _, err := ac.Rdb.PendingStreamMessages(q, grp)
 	if err != nil {
 		return err
 	}
@@ -169,7 +156,7 @@ func (ac *AsyncComm) FlushQ(q string) error {
 	return ac.Rdb.DeleteStream(q)
 }
 
-func (ac *AsyncComm) PendingMessages(q string) (map[string][]string, error) {
+func (ac *AsyncComm) PendingMessages(q string) (map[string][]string, int, error) {
 	return ac.Rdb.PendingStreamMessages(q, q + DefaultConsumerGroup)
 }
 

@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"async-comm/pkg/asynccomm/ac_logger"
+	"async-comm/pkg/asynccomm/logger"
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
@@ -14,7 +14,7 @@ import (
 type Redis struct {
 	Ctx    context.Context
 	RdbCon *redis.Conn
-	Log    ac_logger.Logger
+	Log    logger.Logger
 }
 
 // Packet defines the redis consumed messages
@@ -26,7 +26,7 @@ type Packet struct {
 // NewRdb initializes a new Redis instance and establishes a
 // connection with the redis server, it also manages the ctx
 // at a higher level to be used by all methods of Redis
-func NewRdbWithOpts(ctx context.Context, opts interface{}, log ac_logger.Logger) *Redis {
+func NewRdbWithOpts(ctx context.Context, opts interface{}, log logger.Logger) *Redis {
 	rdbOpts := &redis.Options{
 		Addr: ":6379",
 		PoolSize: 100,
@@ -53,7 +53,7 @@ func NewRdbWithOpts(ctx context.Context, opts interface{}, log ac_logger.Logger)
 	}
 }
 
-func NewRdb(ctx context.Context, host, port, usr, pwd string, log ac_logger.Logger) *Redis {
+func NewRdb(ctx context.Context, host, port, usr, pwd string, log logger.Logger) *Redis {
 	opts := redis.Options{ Addr: fmt.Sprintf("%s:%s", host, port), Username: usr, Password: pwd }
 	return NewRdbWithOpts(ctx, opts, log)
 }
@@ -164,12 +164,15 @@ func (r *Redis) GrpExits(q, grp string) (bool, error) {
 
 // CreateGrp creates a new group for provided stream
 func (r *Redis) CreateGrp(q, grp, start string) error {
-	cmd := r.RdbCon.XGroupCreate(r.Ctx, q, grp, start)
-	sts, err := cmd.Result()
-	if err != nil {
-		return err
+	exits, err := r.GrpExits(q, grp)
+	if err != nil || !exits {
+		cmd := r.RdbCon.XGroupCreateMkStream(r.Ctx, q, grp, start)
+		sts, err := cmd.Result()
+		if err != nil {
+			return err
+		}
+		r.Log.Infof("group '%s' for stream '%s' created: %s", grp, q, sts)
 	}
-	r.Log.Infof("group '%s' for stream '%s' created: %s", grp, q, sts)
 	return nil
 }
 
@@ -211,7 +214,7 @@ func (r *Redis) DeleteStream(q string) error {
 	return nil
 }
 
-func (r *Redis) PendingStreamMessages(q, grp string) (map[string][]string, error) {
+func (r *Redis) PendingStreamMessages(q, grp string) (map[string][]string, int, error) {
 	args := &redis.XPendingExtArgs{
 		Stream:   q,
 		Group:    grp,
@@ -222,13 +225,17 @@ func (r *Redis) PendingStreamMessages(q, grp string) (map[string][]string, error
 	cmd := r.RdbCon.XPendingExt(r.Ctx, args)
 	pending, err := cmd.Result()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	res := make(map[string][]string)
 	for _, mgs := range pending {
 		res[mgs.Consumer] = append(res[mgs.Consumer], mgs.ID)
 	}
-	return res, nil
+	msgCount := 0
+	for _, v := range res {
+		msgCount += len(v)
+	}
+	return res, msgCount, nil
 }
 
 func (r *Redis) ClaimMessages(q, grp,  consumer string, msgId... string) error {

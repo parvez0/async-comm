@@ -13,7 +13,7 @@ const (
 	Q = "async_test_q"
 	Consumer = "test_consumerX"
 	NewConsumer = "test_consumerY"
-	LogLevel = "error"
+	LogLevel = "debug"
 )
 
 var (
@@ -79,7 +79,7 @@ func TestAsyncComm_Ack(t *testing.T) {
 }
 
 func TestAsyncComm_Pending(t *testing.T)  {
-	msgs, err := ac.PendingMessages(Q)
+	msgs, _, err := ac.PendingMessages(Q)
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(msgs), msgs)
 }

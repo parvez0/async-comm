@@ -16,7 +16,7 @@ import (
 type Config struct {
 	App AppConf `json:"application" mapstructure:"application"`
 	Redis  RedisConf  `json:"redis" mapstructure:"redis"`
-	AcLogger AcLoggerConf `json:"ac_logger" mapstructure:"ac_logger"`
+	AcLogger AcLoggerConf `json:"logger" mapstructure:"logger"`
 	Logger struct{
 		Level string `json:"level" mapstructure:"level"`
 		FullTimestamp bool `json:"full_timestamp" mapstructure:"full_timestamp"`

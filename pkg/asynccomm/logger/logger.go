@@ -1,4 +1,4 @@
-package ac_logger
+package logger
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 )
 
 // Logger provides an interface to convert
-// ac_logger to custom ac_logger type, it will have
-// all the basic functionalities of a ac_logger
+// logger to custom logger type, it will have
+// all the basic functionalities of a logger
 type Logger interface {
 	Info(args ...interface{})
 	Warn(args ...interface{})
