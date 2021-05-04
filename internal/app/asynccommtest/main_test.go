@@ -1,7 +1,7 @@
 package main_test
 
 import (
-	"async-comm/internal/app/asynccommtest/src"
+	"async-comm/internal/app/asynccommtest"
 	"async-comm/pkg/asynccomm"
 	"context"
 	"github.com/stretchr/testify/assert"
@@ -16,10 +16,10 @@ const (
 )
 
 var (
-	a *src.App
+	a *main.App
 )
 
-var ProducerRoutine = src.Routine{
+var ProducerRoutine = main.Routine{
 	Role:  "producer",
 	Q:     Q,
 	Name:  "app_test_producer",
@@ -33,7 +33,7 @@ var ProducerRoutine = src.Routine{
 	},
 }
 
-var ConsumerRoutine = src.Routine{
+var ConsumerRoutine = main.Routine{
 	Role:  "consumer",
 	Q:      Q,
 	Name:  "app_test_consumer",
@@ -43,9 +43,9 @@ var ConsumerRoutine = src.Routine{
 
 func TestMain(m *testing.M) {
 	aclib, _ := asynccomm.NewAC(context.TODO(), asynccomm.AcOptions{})
-	cnf := src.InitializeConfig()
+	cnf := main.InitializeConfig()
 	cnf.Logger.Level = LogLevel
-	a = src.NewApp(aclib, cnf, src.InitializeLogger(cnf))
+	a = main.NewApp(aclib, cnf, main.InitializeLogger(cnf))
 	m.Run()
 }
 
@@ -71,9 +71,9 @@ func TestInitializeConsumer(t *testing.T)  {
 
 func TestDeleteQ(t *testing.T)  {
 	aclib, _ := asynccomm.NewAC(context.TODO(), asynccomm.AcOptions{})
-	cnf := src.InitializeConfig()
+	cnf := main.InitializeConfig()
 	cnf.Logger.Level = LogLevel
-	a = src.NewApp(aclib, cnf, src.InitializeLogger(cnf))
+	a = main.NewApp(aclib, cnf, main.InitializeLogger(cnf))
 	err := a.DeleteQ(Q)
 	assert.Nil(t, err)
 }

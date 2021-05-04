@@ -1,4 +1,4 @@
-package src
+package main
 
 import (
 	"crypto/tls"
@@ -14,10 +14,10 @@ import (
 // it defines information about server details and
 // postgres db details including the credentials
 type Config struct {
-	App AppConf `json:"application" mapstructure:"application"`
-	Redis  RedisConf  `json:"redis" mapstructure:"redis"`
+	App      AppConf      `json:"application" mapstructure:"application"`
+	Redis    RedisConf    `json:"redis" mapstructure:"redis"`
 	AcLogger AcLoggerConf `json:"logger" mapstructure:"logger"`
-	Logger struct{
+	Logger   struct{
 		Level string `json:"level" mapstructure:"level"`
 		FullTimestamp bool `json:"full_timestamp" mapstructure:"full_timestamp"`
 		OutputFilePath string `json:"output_file_path" mapstructure:"output_file_path"`

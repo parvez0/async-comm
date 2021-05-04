@@ -1,7 +1,6 @@
 package main
 
 import (
-	"async-comm/internal/app/asynccommtest/src"
 	"async-comm/pkg/asynccomm"
 	"context"
 	"os"
@@ -10,12 +9,11 @@ import (
 	"syscall"
 )
 
-var cnf *src.Config
-var log src.Logger
+var cnf *Config
 
 func init()  {
-	cnf = src.InitializeConfig()
-	log = src.InitializeLogger(cnf)
+	cnf = InitializeConfig()
+	InitializeLogger(cnf)
 }
 
 func main()  {
@@ -29,10 +27,10 @@ func main()  {
 		Redis:  &rdOpts,
 		Logger: &acLogOpts,
 	}
-	c_aclib, err := asynccomm.NewAC(context.TODO(), acOpts)
-	p_aclib, err := asynccomm.NewAC(context.TODO(), acOpts)
-	c_app := src.NewApp(c_aclib, cnf, log)
-	p_app := src.NewApp(p_aclib, cnf, log)
+	cAclib, err := asynccomm.NewAC(context.TODO(), acOpts)
+	pAclib, err := asynccomm.NewAC(context.TODO(), acOpts)
+	cApp := NewApp(cAclib, cnf, log)
+	pApp := NewApp(pAclib, cnf, log)
 	/**
 	 * WaitGroups and channels initialization
 	 */
@@ -49,11 +47,11 @@ func main()  {
 		case "producer":
 			wg.Add(1)
 			// creating producer routine to send messages at every given interval
-			go p_app.InitiateProducer(ctx, r, cnf.App.App, wg)
+			go pApp.InitiateProducer(ctx, r, cnf.App.App, wg)
 		case "consumer":
 			wg.Add(2)
-			go c_app.RegisterConsumer(ctx, r, wg)
-			go c_app.InitiateConsumers(ctx, r, wg)
+			go cApp.RegisterConsumer(ctx, r, wg)
+			go cApp.InitiateConsumers(ctx, r, wg)
 		}
 	}
 	/**

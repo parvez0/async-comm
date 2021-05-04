@@ -1,4 +1,4 @@
-package src
+package main
 
 import (
 	"async-comm/pkg/asynccomm"
@@ -8,8 +8,8 @@ import (
 
 type App struct {
 	aclib *asynccomm.AsyncComm
-	cnf *Config
-	log Logger
+	cnf   *Config
+	log   Logger
 }
 
 func NewApp(aclib *asynccomm.AsyncComm, cnf *Config, log Logger) *App {
