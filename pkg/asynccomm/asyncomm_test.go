@@ -14,6 +14,7 @@ const (
 	Consumer = "test_consumerX"
 	NewConsumer = "test_consumerY"
 	LogLevel = "debug"
+	RefreshTime = 1000
 )
 
 var (
@@ -36,7 +37,7 @@ func TestAsyncComm_SetLogLevel(t *testing.T) {
 }
 
 func TestAsyncComm_ConsumeMessageFailure(t *testing.T) {
-	_, _, err := ac.Pull(context.TODO(), Q, Consumer)
+	_, _, err := ac.Pull(context.TODO(), Q, Consumer, RefreshTime)
 	assert.NotNil(t, err)
 }
 
@@ -60,7 +61,7 @@ func TestAsyncComm_Pull(t *testing.T) {
 	for i:=0; i < 5; i++ {
 		t.Run(fmt.Sprintf("Consuming_Message_%d", i), func(t *testing.T) {
 			c := fmt.Sprintf("%s_%d", Consumer, i%2)
-			msg, id, err := ac.Pull(context.TODO(), Q, c)
+			msg, id, err := ac.Pull(context.TODO(), Q, c, RefreshTime)
 			assert.Nil(t, err)
 			t.Logf("message consumed Id: %s, data : %s", id, string(msg))
 			ids = append(ids, id)
@@ -89,7 +90,7 @@ func TestAsyncComm_DeleteQ(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestAsyncComm_GroupExits(t *testing.T) {
-	exits := ac.GroupExits(Q)
-	assert.Equal(t, false, exits)
+func TestAsyncComm_GroupExists(t *testing.T) {
+	exists := ac.GroupExists(Q)
+	assert.Equal(t, false, exists)
 }

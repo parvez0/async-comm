@@ -145,10 +145,10 @@ func (r *Redis) syncConsumers() {
 	
 }
 
-// GrpExits verifies if provided group exits or not
+// GrpExists verifies if provided group Exists or not
 // it also verifies that the stream we are connecting
-// exits if not it will return an error
-func (r *Redis) GrpExits(q, grp string) (bool, error) {
+// exists if not it will return an error
+func (r *Redis) GrpExists(q, grp string) (bool, error) {
 	cmd := r.RdbCon.XInfoGroups(r.Ctx, q)
 	info, err := cmd.Result()
 	if err != nil {
@@ -164,8 +164,8 @@ func (r *Redis) GrpExits(q, grp string) (bool, error) {
 
 // CreateGrp creates a new group for provided stream
 func (r *Redis) CreateGrp(q, grp, start string) error {
-	exits, err := r.GrpExits(q, grp)
-	if err != nil || !exits {
+	exists, err := r.GrpExists(q, grp)
+	if err != nil || !exists {
 		cmd := r.RdbCon.XGroupCreateMkStream(r.Ctx, q, grp, start)
 		sts, err := cmd.Result()
 		if err != nil {
@@ -187,8 +187,8 @@ func (r *Redis) DeleteGrp(q, grp string) error {
 	return nil
 }
 
-// StreamExits checks if a stream with given name exits or not
-func (r *Redis) StreamExits(q string) bool {
+// StreamExists checks if a stream with given name Exists or not
+func (r *Redis) StreamExists(q string) bool {
 	cmd := r.RdbCon.ScanType(r.Ctx, 0, "", 0, "stream")
 	sts, _,  err := cmd.Result()
 	if err != nil {

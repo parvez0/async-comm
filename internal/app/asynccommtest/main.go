@@ -50,7 +50,8 @@ func main()  {
 			go pApp.InitiateProducer(ctx, r, cnf.App.App, wg)
 		case "consumer":
 			wg.Add(2)
-			go cApp.RegisterConsumer(ctx, r, wg)
+			// registering consumer with keep alive at every r.RefreshTime interval
+			go cApp.aclib.RegisterConsumer(ctx, r.Name, r.RefreshTime, wg)
 			go cApp.InitiateConsumers(ctx, r, wg)
 		}
 	}

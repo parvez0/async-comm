@@ -38,8 +38,8 @@ func Test_RedisProducer(t *testing.T)  {
 	}
 }
 
-func Test_RedisCheckIfGroupExits(t *testing.T)  {
-	res, err := rdb.GrpExits(Q, Group)
+func Test_RedisCheckIfGroupExists(t *testing.T)  {
+	res, err := rdb.GrpExists(Q, Group)
 	assert.Nil(t, err, "group verification failed with error - ", err)
 	assert.Equal(t, res, false)
 }

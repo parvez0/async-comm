@@ -6,6 +6,8 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"os"
+	"sync"
 	"time"
 )
 
@@ -42,6 +44,7 @@ type LoggerOpts struct {
 type AsyncComm struct {
 	Rdb *redis.Redis
 	Log logger.Logger
+	startTimes map[string]time.Time
 }
 
 // NewAC creates a asyncComm library instance for managing
@@ -61,7 +64,7 @@ func NewAC(ctx context.Context, opts AcOptions) (*AsyncComm, error) {
 		return nil, err
 	}
 	rdb := redis.NewRdb(ctx, opts.Redis.Host, opts.Redis.Port, opts.Redis.Username, opts.Redis.Password, log)
-	return &AsyncComm{Rdb: rdb, Log: log}, nil
+	return &AsyncComm{Rdb: rdb, Log: log, startTimes: make(map[string]time.Time)}, nil
 }
 
 // NewACWithBrokerOptions should be used when you want to directly specify the
@@ -95,15 +98,19 @@ func (ac *AsyncComm) SetLogLevel(level string) error {
 	return nil
 }
 
-func (ac *AsyncComm) SetKey(key, value string, expiry time.Duration) (string, error) {
-	return ac.Rdb.Set(key, value, expiry)
-}
-
 func (ac *AsyncComm) Push(q string, msg []byte) (string, error) {
 	return ac.Rdb.Produce(q, string(msg))
 }
 
-func (ac *AsyncComm) Pull(ctx context.Context, q, consumer string) ([]byte, string, error) {
+func (ac *AsyncComm) Pull(ctx context.Context, q, consumer string, refreshTime int) ([]byte, string, error) {
+	if time.Now().After(ac.getStartTime(consumer, refreshTime)) {
+		err := ac.ClaimPendingMessages(q, consumer)
+		if err != nil {
+			ac.Log.Errorf("failed to claim pending messages for stream '%s' by consumer '%s': %s", q, consumer, err.Error())
+		}
+		ac.Log.Debugf("pending message claim request initiated by consumer '%s'", consumer)
+		ac.setStartTime(consumer, refreshTime)
+	}
 	return ac.Rdb.Consume(ctx, q, q + DefaultConsumerGroup, consumer)
 }
 
@@ -111,7 +118,7 @@ func (ac *AsyncComm) Ack(q string, msgId... string) error {
 	return ac.Rdb.Ack(q, q + DefaultConsumerGroup, msgId...)
 }
 
-func (ac *AsyncComm) CreateQ(q string) error {
+func (ac *AsyncComm) CreateQ(q string, persistent bool) error {
 	grp := q + DefaultConsumerGroup
 	return ac.Rdb.CreateGrp(q, grp, "$")
 }
@@ -160,13 +167,47 @@ func (ac *AsyncComm) PendingMessages(q string) (map[string][]string, int, error)
 	return ac.Rdb.PendingStreamMessages(q, q + DefaultConsumerGroup)
 }
 
-func (ac *AsyncComm) GroupExits(q string) bool {
-	exits, err := ac.Rdb.GrpExits(q, q + DefaultConsumerGroup)
+func (ac *AsyncComm) GroupExists(q string) bool {
+	exists, err := ac.Rdb.GrpExists(q, q + DefaultConsumerGroup)
 	if err != nil {
 		ac.Log.Debugf("encountered error verifying group ! { q: %s, grp: %s, err: %s}", q, q + DefaultConsumerGroup, err.Error())
 		return false
 	}
-	return exits
+	return exists
+}
+
+func (ac *AsyncComm) getStartTime(consumer string, refreshTime int) time.Time {
+	if val, ok := ac.startTimes[consumer]; ok {
+		return val
+	}
+	return ac.setStartTime(consumer, refreshTime)
+}
+
+func (ac *AsyncComm) setStartTime(consumer string, refreshTime int) time.Time {
+	now := time.Now().Add(time.Duration(refreshTime) * time.Millisecond)
+	ac.startTimes[consumer] = now
+	return now
+}
+
+func (ac *AsyncComm) RegisterConsumer(ctx context.Context, cnsmr string, rTime int, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			if cnsmr == os.Getenv("TEST_CONSUMER") {
+				return
+			}
+			sts, err := ac.Rdb.Set("active_consumer_" + cnsmr, time.Now().String(), time.Duration(rTime) * time.Millisecond)
+			if err != nil {
+				ac.Log.Panicf("failed to register consumer %s - %s", cnsmr, err.Error())
+			}
+			refreshTime := rTime - (rTime/10)
+			ac.Log.Infof("consumer '%s' registered with refreshTime: '%dms', status: '%s'", cnsmr, refreshTime, sts)
+			time.Sleep(time.Duration(refreshTime) * time.Millisecond)
+		}
+	}
 }
 
 func (ac *AsyncComm) Close()  {
