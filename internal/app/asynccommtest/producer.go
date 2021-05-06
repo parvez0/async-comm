@@ -10,7 +10,7 @@ import (
 
 func (a *App) InitiateProducer(ctx context.Context, ru Routine, app string, wg *sync.WaitGroup) {
 	defer wg.Done()
-	err := a.aclib.CreateQ(ru.Q)
+	err := a.aclib.CreateQ(ru.Q, false)
 	if err != nil {
 		a.log.Panicf("failed to create q '%s' for producer '%s' - %s", ru.Q, ru.Name, err.Error())
 	}

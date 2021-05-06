@@ -2,6 +2,7 @@ package asynccomm_test
 
 import (
 	"async-comm/pkg/asynccomm"
+	"async-comm/pkg/redis"
 	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
@@ -25,8 +26,11 @@ var (
 
 func TestNewAC(t *testing.T) {
 	var err error
-	opts := asynccomm.AcOptions{}
-	ac, err = asynccomm.NewAC(context.TODO(), opts)
+	rdbOpts := redis.Options{
+		LogLevel: LogLevel,
+	}
+	rdb := redis.NewRdb(context.TODO(), rdbOpts)
+	ac, err = asynccomm.NewAC(rdb)
 	assert.Nil(t, err)
 	assert.NotNil(t, ac)
 }
@@ -42,8 +46,13 @@ func TestAsyncComm_ConsumeMessageFailure(t *testing.T) {
 }
 
 func TestAsyncComm_CreateQ(t *testing.T) {
-	err := ac.CreateQ(Q)
+	err := ac.CreateQ(Q, false)
 	assert.Nil(t, err)
+}
+
+func TestAsyncComm_PersistenceCreateQ(t *testing.T) {
+	err := ac.CreateQ(Q, true)
+	assert.NotNil(t, err)
 }
 
 func TestAsyncComm_Push(t *testing.T) {

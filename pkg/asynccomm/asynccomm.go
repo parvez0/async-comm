@@ -4,42 +4,12 @@ import (
 	"async-comm/pkg/asynccomm/logger"
 	"async-comm/pkg/redis"
 	"context"
-	"crypto/tls"
-	"fmt"
 	"os"
 	"sync"
 	"time"
 )
 
 const DefaultConsumerGroup = "-consumer-group"
-
-type AcOptions struct {
-	Broker interface{}
-	Redis *RedisOpts
-	Logger *LoggerOpts
-}
-
-type RedisOpts struct {
-	Host string
-	Port string
-	Username string
-	Password string
-	DB int
-	MaxRetries      int
-	MinRetryBackoff time.Duration
-	MaxRetryBackoff time.Duration
-	PoolSize        int
-	MinIdleConns    int
-	IdleTimeout     time.Duration
-	ReadTimeout     time.Duration
-	WriteTimeout    time.Duration
-	TLSConfig 		*tls.Config
-}
-
-type LoggerOpts struct {
-	Level string `json:"level" mapstructure:"level"`
-	OutputFilePath string `json:"output_file_path" mapstructure:"output_file_path"`
-}
 
 type AsyncComm struct {
 	Rdb *redis.Redis
@@ -49,40 +19,8 @@ type AsyncComm struct {
 
 // NewAC creates a asyncComm library instance for managing
 // async message methods like push, pull etc
-func NewAC(ctx context.Context, opts AcOptions) (*AsyncComm, error) {
-	if opts.Logger == nil {
-		opts.Logger = &LoggerOpts{
-			Level:          "error",
-			OutputFilePath: "",
-		}
-	}
-	if opts.Redis == nil {
-		opts.Redis = &RedisOpts{ Port: "6379" }
-	}
-	log, err := logger.InitializeLogger(opts.Logger.Level, opts.Logger.OutputFilePath)
-	if err != nil {
-		return nil, err
-	}
-	rdb := redis.NewRdb(ctx, opts.Redis.Host, opts.Redis.Port, opts.Redis.Username, opts.Redis.Password, log)
-	return &AsyncComm{Rdb: rdb, Log: log, startTimes: make(map[string]time.Time)}, nil
-}
-
-// NewACWithBrokerOptions should be used when you want to directly specify the
-// backend broker settings like in case of redis you should provide redis.Options{}
-// to AcOptions.Broker{} it accepts an interface and will be validated at broker level
-func NewACWithBrokerOptions(ctx context.Context, opts AcOptions) (*AsyncComm, error) {
-	if opts.Logger == nil {
-		opts.Logger = &LoggerOpts{
-			Level:          "error",
-			OutputFilePath: "",
-		}
-	}
-	log, err := logger.InitializeLogger(opts.Logger.Level, opts.Logger.OutputFilePath)
-	if err != nil {
-		return nil, err
-	}
-	rdb := redis.NewRdbWithOpts(ctx, opts.Broker, log)
-	return &AsyncComm{Rdb: rdb, Log: log}, nil
+func NewAC(rdb *redis.Redis) (*AsyncComm, error) {
+	return &AsyncComm{Rdb: rdb, Log: rdb.Log, startTimes: make(map[string]time.Time)}, nil
 }
 
 // SetLogLevel provides different log levels for the async library
@@ -111,52 +49,23 @@ func (ac *AsyncComm) Pull(ctx context.Context, q, consumer string, refreshTime i
 		ac.Log.Debugf("pending message claim request initiated by consumer '%s'", consumer)
 		ac.setStartTime(consumer, refreshTime)
 	}
-	return ac.Rdb.Consume(ctx, q, q + DefaultConsumerGroup, consumer)
+	return ac.Rdb.Consume(ctx, q, consumer)
 }
 
 func (ac *AsyncComm) Ack(q string, msgId... string) error {
-	return ac.Rdb.Ack(q, q + DefaultConsumerGroup, msgId...)
+	return ac.Rdb.Ack(q, msgId...)
 }
 
 func (ac *AsyncComm) CreateQ(q string, persistent bool) error {
-	grp := q + DefaultConsumerGroup
-	return ac.Rdb.CreateGrp(q, grp, "$")
+	return ac.Rdb.CreateGrp(q, persistent, "")
 }
 
 func (ac *AsyncComm) ClaimPendingMessages(q, consumer string) error {
-	grp := q + DefaultConsumerGroup
-	msgs, _, err := ac.Rdb.PendingStreamMessages(q, grp)
-	if err != nil {
-		return err
-	}
-	var errors []error
-	for k, ids := range msgs {
-		if _, err := ac.Rdb.Get("active_consumers_" + k); err != nil {
-			err := ac.Rdb.ClaimMessages(q, grp, consumer, ids...)
-			if err != nil {
-				errors = append(errors, fmt.Errorf("claimed failed! { inActiveConsumer: %s, err : %s }", k, err.Error()))
-			}
-			ac.Log.Debugf("messages claimed! { inActiveConsumer: %s, newConsumer: %s }", k, consumer)
-		}
-	}
-	if len(errors) > 0 {
-		return fmt.Errorf("%+v", errors)	
-	}
-	return nil
+	return ac.Rdb.ClaimPendingMessages(q, consumer)
 }
 
 func (ac *AsyncComm) DeleteQ(q string) error {
-	err := ac.Rdb.DeleteGrp(q, q + DefaultConsumerGroup)
-	if err != nil {
-		ac.Log.Debugf("deleteGrp failed! { q: %s, grp: %s, err: %s}", q, q + DefaultConsumerGroup, err.Error())
-		return err
-	}
-	err = ac.Rdb.DeleteStream(q)
-	if err != nil {
-		ac.Log.Debugf("deleteStream failed! { q: %s, grp: %s, err: %s}", q, q + DefaultConsumerGroup, err.Error())
-		return err
-	}
-	return nil
+	return ac.Rdb.DeleteQ(q)
 }
 
 func (ac *AsyncComm) FlushQ(q string) error {
@@ -164,11 +73,11 @@ func (ac *AsyncComm) FlushQ(q string) error {
 }
 
 func (ac *AsyncComm) PendingMessages(q string) (map[string][]string, int, error) {
-	return ac.Rdb.PendingStreamMessages(q, q + DefaultConsumerGroup)
+	return ac.Rdb.PendingStreamMessages(q)
 }
 
 func (ac *AsyncComm) GroupExists(q string) bool {
-	exists, err := ac.Rdb.GrpExists(q, q + DefaultConsumerGroup)
+	exists, err := ac.Rdb.GrpExists(q)
 	if err != nil {
 		ac.Log.Debugf("encountered error verifying group ! { q: %s, grp: %s, err: %s}", q, q + DefaultConsumerGroup, err.Error())
 		return false

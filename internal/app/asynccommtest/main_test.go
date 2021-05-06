@@ -3,6 +3,7 @@ package main_test
 import (
 	"async-comm/internal/app/asynccommtest"
 	"async-comm/pkg/asynccomm"
+	acRedis "async-comm/pkg/redis"
 	"context"
 	"github.com/stretchr/testify/assert"
 	"sync"
@@ -42,7 +43,9 @@ var ConsumerRoutine = main.Routine{
 }
 
 func TestMain(m *testing.M) {
-	aclib, _ := asynccomm.NewAC(context.TODO(), asynccomm.AcOptions{})
+	rdOpts := acRedis.Options{}
+	rdb := acRedis.NewRdb(context.TODO(), rdOpts)
+	aclib, _ := asynccomm.NewAC(rdb)
 	cnf := main.InitializeConfig()
 	cnf.Logger.Level = LogLevel
 	a = main.NewApp(aclib, cnf, main.InitializeLogger(cnf))
@@ -70,7 +73,9 @@ func TestInitializeConsumer(t *testing.T)  {
 }
 
 func TestDeleteQ(t *testing.T)  {
-	aclib, _ := asynccomm.NewAC(context.TODO(), asynccomm.AcOptions{})
+	rdbOpts := acRedis.Options{}
+	rdb := acRedis.NewRdb(context.TODO(), rdbOpts)
+	aclib, _ := asynccomm.NewAC(rdb)
 	cnf := main.InitializeConfig()
 	cnf.Logger.Level = LogLevel
 	a = main.NewApp(aclib, cnf, main.InitializeLogger(cnf))

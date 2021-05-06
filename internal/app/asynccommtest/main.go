@@ -2,7 +2,9 @@ package main
 
 import (
 	"async-comm/pkg/asynccomm"
+	"async-comm/pkg/redis"
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -20,15 +22,14 @@ func main()  {
 	/**
 	 *  asynccomm library invocation and app initialization
 	 */
-	rdOpts := asynccomm.RedisOpts(cnf.Redis)
-	acLogOpts := asynccomm.LoggerOpts(cnf.AcLogger)
-	rdOpts.PoolSize = 100
-	acOpts := asynccomm.AcOptions{
-		Redis:  &rdOpts,
-		Logger: &acLogOpts,
+	rdOpts := redis.Options{
+		Addr: fmt.Sprintf("%s:%s", cnf.Redis.Host, cnf.Redis.Port),
+		PoolSize: 100,
 	}
-	cAclib, err := asynccomm.NewAC(context.TODO(), acOpts)
-	pAclib, err := asynccomm.NewAC(context.TODO(), acOpts)
+	cRdb := redis.NewRdb(context.TODO(), rdOpts)
+	pRdb := redis.NewRdb(context.TODO(), rdOpts)
+	cAclib, err := asynccomm.NewAC(cRdb)
+	pAclib, err := asynccomm.NewAC(pRdb)
 	cApp := NewApp(cAclib, cnf, log)
 	pApp := NewApp(pAclib, cnf, log)
 	/**

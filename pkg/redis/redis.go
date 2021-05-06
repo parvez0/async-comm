@@ -3,11 +3,16 @@ package redis
 import (
 	"async-comm/pkg/asynccomm/logger"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/imdario/mergo"
-	"reflect"
+	"net"
 	"time"
+)
+
+const (
+	DefaultConsumerGrpSuf = "-consumer-group"
 )
 
 // Redis provides methods to interact with redis database
@@ -23,10 +28,40 @@ type Packet struct {
 	Id string
 }
 
+type Options struct {
+	Network            string
+	Addr               string
+	Dialer             func(ctx context.Context, network string, addr string) (net.Conn, error)
+	OnConnect          func(ctx context.Context, cn *redis.Conn) error
+	Username           string
+	Password           string
+	DB                 int
+	MaxRetries         int
+	MinRetryBackoff    time.Duration
+	MaxRetryBackoff    time.Duration
+	DialTimeout        time.Duration
+	ReadTimeout        time.Duration
+	WriteTimeout       time.Duration
+	PoolSize           int
+	MinIdleConns       int
+	MaxConnAge         time.Duration
+	PoolTimeout        time.Duration
+	IdleTimeout        time.Duration
+	IdleCheckFrequency time.Duration
+	readOnly           bool
+	TLSConfig          *tls.Config
+	Limiter            redis.Limiter
+	LogLevel           string
+	LogFilePath		   string
+}
+
 // NewRdb initializes a new Redis instance and establishes a
 // connection with the redis server, it also manages the ctx
 // at a higher level to be used by all methods of Redis
-func NewRdbWithOpts(ctx context.Context, opts interface{}, log logger.Logger) *Redis {
+func NewRdb(ctx context.Context, opts Options) *Redis {
+	if opts.LogLevel == "" {
+		opts.LogLevel = "error"
+	}
 	rdbOpts := &redis.Options{
 		Addr: ":6379",
 		PoolSize: 100,
@@ -35,15 +70,8 @@ func NewRdbWithOpts(ctx context.Context, opts interface{}, log logger.Logger) *R
 		WriteTimeout: 5 * time.Second,
 		MinIdleConns: 3,
 	}
-	switch opts.(type) {
-	case redis.Options:
-		val := opts.(redis.Options)
-		mergo.Merge(rdbOpts, val, mergo.WithOverride)
-	case *redis.Options:
-		mergo.Merge(rdbOpts, opts.(*redis.Options), mergo.WithOverride)
-	default:
-		panic(fmt.Sprintf("type redis.Options required provided: %s", reflect.TypeOf(opts)))
-	}
+	mergo.Merge(&rdbOpts, opts, mergo.WithOverride)
+	log, _ := logger.InitializeLogger(opts.LogLevel, opts.LogFilePath)
 	rdbOpts.OnConnect = onConnect
 	rdb := redis.NewClient(rdbOpts)
 	return &Redis{
@@ -51,11 +79,6 @@ func NewRdbWithOpts(ctx context.Context, opts interface{}, log logger.Logger) *R
 		Ctx: ctx,
 		Log: log,
 	}
-}
-
-func NewRdb(ctx context.Context, host, port, usr, pwd string, log logger.Logger) *Redis {
-	opts := redis.Options{ Addr: fmt.Sprintf("%s:%s", host, port), Username: usr, Password: pwd }
-	return NewRdbWithOpts(ctx, opts, log)
 }
 
 // Close closes the redis connection when called
@@ -98,10 +121,10 @@ func (r *Redis) Produce(qName string, msg string) (string, error) {
 // by calling Ack(). It also take cares of verifying the
 // alive consumers and rescheduling of pending messages
 // using r.syncConsumers in every RsyncTime interval
-func (r *Redis) Consume(ctx context.Context, q, g, name string) ([]byte, string, error) {
-
+func (r *Redis) Consume(ctx context.Context, q, name string) ([]byte, string, error) {
+	grp := q + DefaultConsumerGrpSuf
 	args := redis.XReadGroupArgs{
-		Group:     g,
+		Group:     grp,
 		Consumer:  name,
 		Streams:   []string{q, ">"},
 		Count:     1,
@@ -112,7 +135,7 @@ func (r *Redis) Consume(ctx context.Context, q, g, name string) ([]byte, string,
 	if err != nil {
 		return nil, "", err
 	}
-	r.Log.Debugf("message consumed from stream '%s' by consumer '%s'.'%s' : %#v", q, name, g, res)
+	r.Log.Debugf("message consumed from stream '%s' by consumer '%s'.'%s' : %#v", q, name, res)
 	for _, xmsg := range res {
 		for _, m := range xmsg.Messages {
 			return []byte(fmt.Sprintf("%v", m.Values["message"])), m.ID, nil
@@ -125,8 +148,9 @@ func (r *Redis) Consume(ctx context.Context, q, g, name string) ([]byte, string,
 // consumption if the message is not ack it will go
 // into pending state where it will be reschedule to
 // other consumers through syncConsumers
-func (r *Redis) Ack(q, g string, msgId... string) error {
-	xack := r.RdbCon.XAck(r.Ctx, q, g, msgId...)
+func (r *Redis) Ack(q string, msgId... string) error {
+	grp := q + DefaultConsumerGrpSuf
+	xack := r.RdbCon.XAck(r.Ctx, q, grp, msgId...)
 	res, err := xack.Result()
 	if err != nil {
 		r.Log.Errorf("failed acknowledge { ids: %v, err: %s }", msgId, err.Error())
@@ -148,7 +172,8 @@ func (r *Redis) syncConsumers() {
 // GrpExists verifies if provided group Exists or not
 // it also verifies that the stream we are connecting
 // exists if not it will return an error
-func (r *Redis) GrpExists(q, grp string) (bool, error) {
+func (r *Redis) GrpExists(q string) (bool, error) {
+	grp := q + DefaultConsumerGrpSuf
 	cmd := r.RdbCon.XInfoGroups(r.Ctx, q)
 	info, err := cmd.Result()
 	if err != nil {
@@ -163,10 +188,17 @@ func (r *Redis) GrpExists(q, grp string) (bool, error) {
 }
 
 // CreateGrp creates a new group for provided stream
-func (r *Redis) CreateGrp(q, grp, start string) error {
-	exists, err := r.GrpExists(q, grp)
+func (r *Redis) CreateGrp(q string, persistent bool, start string) error {
+	if persistent {
+		return fmt.Errorf("fatal error! persistence not supported")
+	}
+	if start == "" {
+		start = "$"
+	}
+	grp := q + DefaultConsumerGrpSuf
+	exists, err := r.GrpExists(q)
 	if err != nil || !exists {
-		cmd := r.RdbCon.XGroupCreateMkStream(r.Ctx, q, grp, start)
+		cmd := r.RdbCon.XGroupCreateMkStream(r.Ctx, q, grp,  start)
 		sts, err := cmd.Result()
 		if err != nil {
 			return err
@@ -177,7 +209,8 @@ func (r *Redis) CreateGrp(q, grp, start string) error {
 }
 
 // DeleteGrp creates a new group for provided stream
-func (r *Redis) DeleteGrp(q, grp string) error {
+func (r *Redis) DeleteGrp(q string) error {
+	grp := q + DefaultConsumerGrpSuf
 	cmd := r.RdbCon.XGroupDestroy(r.Ctx, q, grp)
 	sts, err := cmd.Result()
 	if err != nil {
@@ -214,7 +247,8 @@ func (r *Redis) DeleteStream(q string) error {
 	return nil
 }
 
-func (r *Redis) PendingStreamMessages(q, grp string) (map[string][]string, int, error) {
+func (r *Redis) PendingStreamMessages(q string) (map[string][]string, int, error) {
+	grp := q + DefaultConsumerGrpSuf
 	args := &redis.XPendingExtArgs{
 		Stream:   q,
 		Group:    grp,
@@ -238,7 +272,30 @@ func (r *Redis) PendingStreamMessages(q, grp string) (map[string][]string, int, 
 	return res, msgCount, nil
 }
 
-func (r *Redis) ClaimMessages(q, grp,  consumer string, msgId... string) error {
+func (r *Redis) ClaimPendingMessages(q, consumer string) error  {
+	msgs, _, err := r.PendingStreamMessages(q)
+	if err != nil {
+		r.Log.Errorf("failed to fetch pending messages { q: %s, consumer: %s, error: %s}", q, consumer, err.Error())
+		return err
+	}
+	var errors []error
+	for k, ids := range msgs {
+		if _, err := r.Get("active_consumers_" + k); err != nil {
+			err := r.claimMessages(q, consumer, ids...)
+			if err != nil {
+				errors = append(errors, fmt.Errorf("claimed failed! { inActiveConsumer: %s, err : %s }", k, err.Error()))
+			}
+			r.Log.Debugf("messages claimed! { inActiveConsumer: %s, newConsumer: %s }", k, consumer)
+		}
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("%+v", errors)
+	}
+	return nil
+}
+
+func (r *Redis) claimMessages(q,  consumer string, msgId... string) error {
+	grp := q + DefaultConsumerGrpSuf
 	args := &redis.XClaimArgs{
 		Stream:    q,
 		Group:     grp,
@@ -252,6 +309,21 @@ func (r *Redis) ClaimMessages(q, grp,  consumer string, msgId... string) error {
 		return err
 	}
 	r.Log.Debugf("message claimed - %#v", msg)
+	return nil
+}
+
+func (r *Redis) DeleteQ(q string) error {
+	grp := q + DefaultConsumerGrpSuf
+	err := r.DeleteGrp(q)
+	if err != nil {
+		r.Log.Debugf("deleteGrp failed! { q: %s, grp: %s, err: %s}", q, grp, err.Error())
+		return err
+	}
+	err = r.DeleteStream(q)
+	if err != nil {
+		r.Log.Debugf("deleteStream failed! { q: %s, grp: %s, err: %s}", q, grp, err.Error())
+		return err
+	}
 	return nil
 }
 

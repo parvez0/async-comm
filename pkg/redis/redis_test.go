@@ -1,7 +1,6 @@
 package redis_test
 
 import (
-	"async-comm/pkg/asynccomm/logger"
 	"async-comm/pkg/redis"
 	"context"
 	"fmt"
@@ -24,8 +23,10 @@ var (
 )
 
 func Test_RedisConnection(t *testing.T) {
-	log, _ := logger.InitializeLogger(LogLevel, "")
-	rdb = redis.NewRdb(context.TODO(), RedisHost, RedisPort,"", "", log)
+	opts := redis.Options{
+		LogLevel: LogLevel,
+	}
+	rdb = redis.NewRdb(context.TODO(), opts)
 }
 
 func Test_RedisProducer(t *testing.T)  {
@@ -39,13 +40,13 @@ func Test_RedisProducer(t *testing.T)  {
 }
 
 func Test_RedisCheckIfGroupExists(t *testing.T)  {
-	res, err := rdb.GrpExists(Q, Group)
+	res, err := rdb.GrpExists(Q)
 	assert.Nil(t, err, "group verification failed with error - ", err)
 	assert.Equal(t, res, false)
 }
 
 func Test_RedisCreateGroup(t *testing.T)  {
-	err := rdb.CreateGrp(Q, Group, "0")
+	err := rdb.CreateGrp(Q, false, "0")
 	assert.Nil(t, err)
 }
 
@@ -53,7 +54,7 @@ func Test_RedisConsumer(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		wrk := Consumers[i%2]
 		t.Run(fmt.Sprintf("%s_%d", wrk, i), func(t *testing.T) {
-			res, id, err := rdb.Consume(context.TODO(), Q, Group, wrk)
+			res, id, err := rdb.Consume(context.TODO(), Q, wrk)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -63,7 +64,7 @@ func Test_RedisConsumer(t *testing.T) {
 }
 
 func Test_RedisDestroyGroup(t *testing.T) {
-	err := rdb.DeleteGrp(Q, Group)
+	err := rdb.DeleteGrp(Q)
 	assert.Nil(t, err)
 }
 
