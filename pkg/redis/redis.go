@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/go-redis/redis/v8"
-	"github.com/imdario/mergo"
 	"net"
 	"strconv"
 	"time"
@@ -64,14 +63,14 @@ func NewRdb(ctx context.Context, opts Options) *Redis {
 		opts.LogLevel = "panic"
 	}
 	rdbOpts := &redis.Options{
-		Addr: ":6379",
-		PoolSize: 100,
+		Addr: opts.Addr,
+		PoolSize: opts.PoolSize,
 		ReadTimeout: 5 * time.Second,
 		MaxRetries: 3,
 		WriteTimeout: 5 * time.Second,
 		MinIdleConns: 3,
 	}
-	mergo.Merge(&rdbOpts, opts, mergo.WithOverride)
+
 	log, _ := logger.InitializeLogger(opts.LogLevel, opts.LogFilePath)
 	rdbOpts.OnConnect = onConnect
 	rdb := redis.NewClient(rdbOpts)
@@ -140,7 +139,7 @@ func (r *Redis) Consume(q, name string, block time.Duration) ([]byte, string, er
 	if err != nil {
 		return nil, "", err
 	}
-	r.Log.Debugf("message consumed from stream '%s' by consumer '%s'.'%s' : %#v", q, name, res)
+	r.Log.Debugf("message consumed from stream '%s' by consumer '%s'.'%s'", q, name, grp)
 	for _, xmsg := range res {
 		for _, m := range xmsg.Messages {
 			return []byte(fmt.Sprintf("%v", m.Values["message"])), m.ID, nil

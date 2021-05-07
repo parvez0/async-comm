@@ -20,14 +20,8 @@ ac_logger:
 application:
   app: App-B
   routines:
-    - role: producer
-      q: req-a-q #group req-q-consumer-group
-      name: producerA
-      message:
-        format: "{{.App}}-{{.Producer}}-{{.Time}}"
-        freq: 5000
     - role: consumer
       q: req-a-q
       name: consumerA
-      processing_time: 5000
+      processing_time: 500
       refresh_time: 5000

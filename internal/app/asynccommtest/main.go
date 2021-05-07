@@ -25,10 +25,10 @@ func main()  {
 	// Reviewed-Changes - initializing redis library and passing it to asynccomm
 	rdOpts := redis.Options{
 		Addr: fmt.Sprintf("%s:%s", cnf.Redis.Host, cnf.Redis.Port),
-		PoolSize: 100,
 		LogLevel: cnf.AcLogger.Level,
 		LogFilePath: cnf.AcLogger.OutputFilePath,
 	}
+	log.Debugf("starting redis with conf: %+v", cnf.Redis)
 	cRdb := redis.NewRdb(context.TODO(), rdOpts)
 	pRdb := redis.NewRdb(context.TODO(), rdOpts)
 	cAclib, err := asynccomm.NewAC(cRdb)

@@ -101,9 +101,10 @@ func InitializeConfig() *Config {
 	// Set undefined variables
 	viper.SetDefault("application.app", hostname)
 	viper.SetDefault("application.claim_time", 5000)
-	viper.SetDefault("db.host", "localhost")
-	viper.SetDefault("db.port", "3306")
-	viper.SetDefault("db.username", "")
+	viper.SetDefault("redis.host", "localhost")
+	viper.SetDefault("redis.port", "3306")
+	viper.SetDefault("redis.username", "")
+	viper.SetDefault("redis.password", "")
 	viper.SetDefault("app_logger.level", "info")
 	viper.SetDefault("app_logger.full_timestamp", true)
 

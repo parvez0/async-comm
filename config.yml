@@ -1,6 +1,6 @@
 # redis connection information
 redis:
-  host: 172.17.0.2
+  host:
   port: 6379
   username: ""
   password: ""
@@ -26,7 +26,7 @@ application:
       name: producerA
       message:
         format: "{{.App}}-{{.Producer}}-{{.Time}}"
-        freq: 100000
+        freq: 1000
     - role: consumer
       q: req-a-q
       name: consumerX

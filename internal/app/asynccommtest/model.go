@@ -42,7 +42,10 @@ func GetTimeFromString(msg string) (t time.Time) {
 	}()
 	r := regexp.MustCompile("\\d{2}:\\d{2}:\\d{2}:\\d{2}:\\d{2}\\.\\d{3}")
 	msgTime := r.FindString(msg)
-	loc, _ := time.LoadLocation("Asia/Kolkata")
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		log.Errorf("failed to load location 'Asia/Kolkata': %s", err.Error())
+	}
 	prts := strings.Split(msgTime, ":")
 	mnth, _ := strconv.Atoi(prts[0])
 	day, _ := strconv.Atoi(prts[1])

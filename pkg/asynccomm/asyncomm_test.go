@@ -15,7 +15,6 @@ const (
 	Consumer = "test_consumerX"
 	NewConsumer = "test_consumerY"
 	LogLevel = "debug"
-	RefreshTime = 1000
 )
 
 var (
@@ -41,7 +40,7 @@ func TestAsyncComm_SetLogLevel(t *testing.T) {
 }
 
 func TestAsyncComm_ConsumeMessageFailure(t *testing.T) {
-	_, _, err := ac.Pull(context.TODO(), Q, Consumer)
+	_, _, err := ac.Pull(Q, Consumer, 100)
 	assert.NotNil(t, err)
 }
 
@@ -70,7 +69,7 @@ func TestAsyncComm_Pull(t *testing.T) {
 	for i:=0; i < 5; i++ {
 		t.Run(fmt.Sprintf("Consuming_Message_%d", i), func(t *testing.T) {
 			c := fmt.Sprintf("%s_%d", Consumer, i%2)
-			msg, id, err := ac.Pull(context.TODO(), Q, c)
+			msg, id, err := ac.Pull(Q, c, 100)
 			assert.Nil(t, err)
 			t.Logf("message consumed Id: %s, data : %s", id, string(msg))
 			ids = append(ids, id)

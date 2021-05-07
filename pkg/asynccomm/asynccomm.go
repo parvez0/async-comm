@@ -50,7 +50,7 @@ func (ac *AsyncComm) Pull(q, consumer string, block time.Duration) ([]byte, stri
 		tm = ac.setStartTime(consumer)
 	}
 	if time.Now().After(tm) {
-		err := ac.claimPendingMessages(q, consumer)
+		err := ac.ClaimPendingMessages(q, consumer)
 		if err != nil {
 			ac.Log.Errorf("failed to claim pending messages for stream '%s' by consumer '%s': %s", q, consumer, err.Error())
 		}
@@ -68,7 +68,7 @@ func (ac *AsyncComm) CreateQ(q string, persistent bool) error {
 	return ac.Rdb.CreateGrp(q, persistent, "")
 }
 
-func (ac *AsyncComm) claimPendingMessages(q, consumer string) error {
+func (ac *AsyncComm) ClaimPendingMessages(q, consumer string) error {
 	return ac.Rdb.ClaimPendingMessages(q, consumer)
 }
 
@@ -115,8 +115,8 @@ func (ac *AsyncComm) RegisterConsumer(ctx context.Context, cnsmr string, rTime, 
 	}
 }
 
-func (ac *AsyncComm) GetQStats() (map[string]string, error) {
-	return ac.Rdb.GetQStats()
+func (ac *AsyncComm) GetQStats(opts redis.QStatusOptions) (redis.QStatus, error) {
+	return ac.Rdb.GetQStats(opts)
 }
 
 func (ac *AsyncComm) getStartTime(consumer string) (time.Time, error) {

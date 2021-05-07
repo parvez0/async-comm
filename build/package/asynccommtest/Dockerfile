@@ -1,6 +1,4 @@
-FROM golang:1.16.3-alpine3.12 AS BUILD-ENV
-
-RUN apk update && apk add git curl build-base
+FROM golang:1.16.3 AS BUILD-ENV
 
 WORKDIR /app
 
@@ -13,14 +11,15 @@ COPY ../../../ .
 
 # Build binary
 # -o denotes where to put executable
-RUN go build -o /go/bin/asynccomm ./internal/app/asynccommtest
+RUN env GOOS=linux GOARCH=amd64 go build -o /go/bin/asynccomm ./internal/app/asynccommtest
 
 # Production image
-FROM alpine:3.12
+FROM ubuntu:20.04
+
+RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
 
 # Create Non Privileged user
-RUN addgroup --gid 101 app && \
-    adduser -S --uid 101 --ingroup app app
+RUN useradd --uid 1001 app
 
 RUN mkdir -p /etc/async-comm && chown -R app:app /etc/async-comm
 VOLUME /etc/async-comm
