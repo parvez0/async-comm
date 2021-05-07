@@ -24,7 +24,7 @@ services:
       REDIS.HOST: redis
       REDIS.PORT: 6379
     volumes:
-      - ./config.yml:/etc/async-comm/config.yml
+      - ./config1.yml:/etc/async-comm/config1.yml
 
   app-altername:
     image: docker.io/parvez0/asynccomm
@@ -37,4 +37,4 @@ services:
       REDIS.HOST: redis
       REDIS.PORT: 6379
     volumes:
-      - ./config-test.yml:/etc/async-comm/config.yml
+      - ./config2.yml:/etc/async-comm/config1.yml
