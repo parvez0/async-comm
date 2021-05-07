@@ -5,7 +5,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
-	"sync"
 )
 
 // Logger provides an interface to convert
@@ -24,16 +23,12 @@ type Logger interface {
 }
 
 var log *logrus.Logger
-var mutex = sync.Mutex{}
 
 // NewLogger returns a logrus custom_logger object with prefilled options
 func InitializeLogger(config *Config) Logger {
 	if log != nil {
 		return log
 	}
-
-	mutex.Lock()
-	defer mutex.Unlock()
 
 	baseLogger := logrus.New()
 

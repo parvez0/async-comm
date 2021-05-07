@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"os"
-	"strings"
 	"sync"
 	"time"
 )
@@ -16,17 +15,20 @@ func (a *App) InitiateConsumers(ctx context.Context, r Routine, wg *sync.WaitGro
 			a.log.Warnf("sigterm received, safely stopping consumer '%s'", r.Name)
 			return
 		default:
-			msg, id,  err := a.aclib.Pull(ctx, r.Q, r.Name, r.RefreshTime)
+			msg, id,  err := a.aclib.Pull(r.Q, r.Name, 100 * time.Millisecond)
 			if err != nil {
-				a.log.Errorf("failed to consume message: { stream: %s, consumer: %s, error: %s }", r.Q, r.Name, err.Error())
+				// ignoring consumer readTimeout error
+				// ReadTimeoutError get triggers when no messages were received during the specified time
+				if err.Error() == "redis: nil" {
+					continue
+				}
+				a.log.Infof("Failed Pulling: { stream: %s, consumer: %s, error: %s }", r.Q, r.Name, err.Error())
 			} else {
 				sMsg := string(msg)
-				msgTime := time.Now()
-				if msgParts := strings.Split(sMsg, "-"); len(msgParts) > 1 {
-					msgTime = GetTimeFromString(msgParts[2])
-				}
-				timeTaken := time.Now().Sub(msgTime)
-				a.log.Infof("Pulled %s at %s by %s", sMsg, GetCurTime(), r.Name)
+				msgTime := GetTimeFromString(sMsg)
+				tm := time.Now()
+				timeTaken := tm.Sub(msgTime)
+				a.log.Infof("Pulled %s at %s by %s", sMsg, FormatTime(tm), r.Name)
 				a.log.Infof("Time %s remained in the Queuing System: %dms", sMsg, timeTaken.Milliseconds())
 				time.Sleep(time.Duration(r.ProcessingTime) * time.Millisecond)
 				if id != "" || r.Name != os.Getenv("TEST_CONSUMER") {
@@ -35,7 +37,7 @@ func (a *App) InitiateConsumers(ctx context.Context, r Routine, wg *sync.WaitGro
 						a.log.Errorf("failed to ack message %s by consumer %s : %s", id, r.Name, err.Error())
 					}
 					a.log.Infof("Processing over for %s at %s", sMsg, GetCurTime())
-					a.log.Infof("Total Time taken for processing %s: %dms", sMsg, time.Now().Sub(msgTime))
+					a.log.Infof("Total Time taken for processing %s: %dms", sMsg, time.Now().Sub(msgTime).Milliseconds())
 				}
 			}
 		}

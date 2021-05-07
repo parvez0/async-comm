@@ -13,19 +13,20 @@ app_logger:
 
 # ac library logger configuration
 ac_logger:
-  level: error
+  level: panic
   output_file_path: ""
 
 # application information
 application:
   app: App-A
+  claim_time: 2000
   routines:
     - role: producer
       q: req-a-q #group req-q-consumer-group
       name: producerA
       message:
         format: "{{.App}}-{{.Producer}}-{{.Time}}"
-        freq: 100
+        freq: 100000
     - role: consumer
       q: req-a-q
       name: consumerX

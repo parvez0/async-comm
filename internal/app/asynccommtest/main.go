@@ -22,9 +22,12 @@ func main()  {
 	/**
 	 *  asynccomm library invocation and app initialization
 	 */
+	// Reviewed-Changes - initializing redis library and passing it to asynccomm
 	rdOpts := redis.Options{
 		Addr: fmt.Sprintf("%s:%s", cnf.Redis.Host, cnf.Redis.Port),
 		PoolSize: 100,
+		LogLevel: cnf.AcLogger.Level,
+		LogFilePath: cnf.AcLogger.OutputFilePath,
 	}
 	cRdb := redis.NewRdb(context.TODO(), rdOpts)
 	pRdb := redis.NewRdb(context.TODO(), rdOpts)
@@ -51,8 +54,8 @@ func main()  {
 			go pApp.InitiateProducer(ctx, r, cnf.App.App, wg)
 		case "consumer":
 			wg.Add(2)
-			// registering consumer with keep alive at every r.RefreshTime interval
-			go cApp.aclib.RegisterConsumer(ctx, r.Name, r.RefreshTime, wg)
+			// Reviewed changes: registering consumer with keep alive at every r.RefreshTime interval
+			go pApp.aclib.RegisterConsumer(ctx, r.Name, r.RefreshTime, cnf.App.ClaimTime, wg)
 			go cApp.InitiateConsumers(ctx, r, wg)
 		}
 	}

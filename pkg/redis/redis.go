@@ -8,6 +8,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/imdario/mergo"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -60,7 +61,7 @@ type Options struct {
 // at a higher level to be used by all methods of Redis
 func NewRdb(ctx context.Context, opts Options) *Redis {
 	if opts.LogLevel == "" {
-		opts.LogLevel = "error"
+		opts.LogLevel = "panic"
 	}
 	rdbOpts := &redis.Options{
 		Addr: ":6379",
@@ -121,7 +122,10 @@ func (r *Redis) Produce(qName string, msg string) (string, error) {
 // by calling Ack(). It also take cares of verifying the
 // alive consumers and rescheduling of pending messages
 // using r.syncConsumers in every RsyncTime interval
-func (r *Redis) Consume(ctx context.Context, q, name string) ([]byte, string, error) {
+func (r *Redis) Consume(q, name string, block time.Duration) ([]byte, string, error) {
+	if block == 0 {
+		block = 500 * time.Millisecond
+	}
 	grp := q + DefaultConsumerGrpSuf
 	args := redis.XReadGroupArgs{
 		Group:     grp,
@@ -129,8 +133,9 @@ func (r *Redis) Consume(ctx context.Context, q, name string) ([]byte, string, er
 		Streams:   []string{q, ">"},
 		Count:     1,
 		NoAck:     false,
+		Block:     block,
 	}
-	cmd := r.RdbCon.XReadGroup(ctx, &args)
+	cmd := r.RdbCon.XReadGroup(r.Ctx, &args)
 	res, err := cmd.Result()
 	if err != nil {
 		return nil, "", err
@@ -156,17 +161,13 @@ func (r *Redis) Ack(q string, msgId... string) error {
 		r.Log.Errorf("failed acknowledge { ids: %v, err: %s }", msgId, err.Error())
 		return err
 	}
+	cmd := r.RdbCon.IncrBy(r.Ctx, fmt.Sprintf("%s::%s::acknowledge", q, grp), int64(len(msgId)))
+	_, err = cmd.Result()
+	if err != nil {
+		r.Log.Debugf("failed to increment acknowledge counter { q: %s, grp: %s, error: %s }", q, grp, err.Error())
+	}
 	r.Log.Debugf("message acknowledge successfully for message %v - res : %d", msgId, res)
 	return nil
-}
-
-// syncConsumers fetches all the pending messages in
-// the stream and check if there consumer is alive
-// by verifying it with the sync queue. if the consumer
-// is not present in the queue a request will be raised
-// by this consumer to claim that message using XClaim
-func (r *Redis) syncConsumers() {
-	
 }
 
 // GrpExists verifies if provided group Exists or not
@@ -238,12 +239,33 @@ func (r *Redis) StreamExists(q string) bool {
 
 // DeleteStream will delete the whole stream with it's data
 func (r *Redis) DeleteStream(q string) error {
+	grp := q + DefaultConsumerGrpSuf
 	cmd := r.RdbCon.Del(r.Ctx, q)
 	sts, err := cmd.Result()
 	if err != nil {
 		return err
 	}
 	r.Log.Infof("stream '%s' deleted: %d", q, sts)
+	dCmd := r.RdbCon.Del(r.Ctx, fmt.Sprintf("%s::%s::acknowledge", q, grp))
+	_, err = dCmd.Result()
+	if err != nil {
+		r.Log.Debugf("failed to delete counter %s: %s", fmt.Sprintf("%s::%s::acknowledge", q, grp), err.Error())
+	}
+	return nil
+}
+
+func (r *Redis) DeleteQ(q string) error {
+	grp := q + DefaultConsumerGrpSuf
+	err := r.DeleteGrp(q)
+	if err != nil {
+		r.Log.Debugf("deleteGrp failed! { q: %s, grp: %s, err: %s}", q, grp, err.Error())
+		return err
+	}
+	err = r.DeleteStream(q)
+	if err != nil {
+		r.Log.Debugf("deleteStream failed! { q: %s, grp: %s, err: %s}", q, grp, err.Error())
+		return err
+	}
 	return nil
 }
 
@@ -294,6 +316,83 @@ func (r *Redis) ClaimPendingMessages(q, consumer string) error  {
 	return nil
 }
 
+func (r *Redis) GetQStats(opts QStatusOptions) (QStatus, error) {
+	status := QStatus{}
+	var err error
+	status.Info, err = r.getStreamInfo(opts.Q)
+	if err != nil {
+		return status, err
+	}
+	if opts.Groups {
+		status.Groups = r.getGroupInfo(opts.Q)
+	}
+	if opts.Consumer {
+		status.Consumers = r.getConsumerInfo(opts.Q)
+	}
+	return status, nil
+}
+
+func (r *Redis) getAckMessagesInQ(q string) int64 {
+	grp := q + DefaultConsumerGrpSuf
+	key := fmt.Sprintf("%s::%s::acknowledge", q, grp)
+	cnt, err := r.Get(key)
+	if err != nil {
+		r.Log.Debugf("failed to fetch total count from increment key '%s': %s",key, err.Error())
+		return 0
+	}
+	acked, _ := strconv.Atoi(cnt)
+	return int64(acked)
+}
+
+func (r *Redis) getConsumerInfo(q string) []Consumer {
+	grp := q + DefaultConsumerGrpSuf
+	cmd := r.RdbCon.XInfoConsumers(r.Ctx, q, grp)
+	info, err := cmd.Result()
+	if err != nil {
+		r.Log.Debugf("failed to fetch consumer info '%s': %s", q, err.Error())
+		return nil
+	}
+	var consumerInfo []Consumer
+	for _, v := range info {
+		consumerInfo = append(consumerInfo, Consumer(v))
+	}
+	return consumerInfo
+}
+
+func (r *Redis) getGroupInfo(q string) []Group {
+	cmd := r.RdbCon.XInfoGroups(r.Ctx, q)
+	info, err := cmd.Result()
+	if err != nil {
+		r.Log.Debugf("failed to fetch groups info '%s': %s", q, err.Error())
+		return nil
+	}
+	var grpInfo []Group
+	for _, v := range info {
+		grpInfo = append(grpInfo, Group(v))
+	}
+	return grpInfo
+}
+
+func (r *Redis) getStreamInfo(q string) (Info, error) {
+	cmd := r.RdbCon.XInfoStream(r.Ctx, q)
+	info, err := cmd.Result()
+	if err != nil {
+		r.Log.Debugf("failed to fetch stream info '%s': %s", q, err.Error())
+		return Info{}, err
+	}
+	ackMsgCount := r.getAckMessagesInQ(q)
+	return Info{
+		Length:          info.Length,
+		Acknowledged:    ackMsgCount,
+		RadixTreeKeys:   info.RadixTreeKeys,
+		RadixTreeNodes:  info.RadixTreeNodes,
+		LastGeneratedID: info.LastGeneratedID,
+		Groups:          info.Groups,
+		FirstEntry:      Message(info.FirstEntry),
+		LastEntry:       Message(info.LastEntry),
+	}, nil
+}
+
 func (r *Redis) claimMessages(q,  consumer string, msgId... string) error {
 	grp := q + DefaultConsumerGrpSuf
 	args := &redis.XClaimArgs{
@@ -312,19 +411,13 @@ func (r *Redis) claimMessages(q,  consumer string, msgId... string) error {
 	return nil
 }
 
-func (r *Redis) DeleteQ(q string) error {
-	grp := q + DefaultConsumerGrpSuf
-	err := r.DeleteGrp(q)
-	if err != nil {
-		r.Log.Debugf("deleteGrp failed! { q: %s, grp: %s, err: %s}", q, grp, err.Error())
-		return err
-	}
-	err = r.DeleteStream(q)
-	if err != nil {
-		r.Log.Debugf("deleteStream failed! { q: %s, grp: %s, err: %s}", q, grp, err.Error())
-		return err
-	}
-	return nil
+// syncConsumers fetches all the pending messages in
+// the stream and check if there consumer is alive
+// by verifying it with the sync queue. if the consumer
+// is not present in the queue a request will be raised
+// by this consumer to claim that message using XClaim
+func (r *Redis) syncConsumers() {
+
 }
 
 // onConnect informs if the connection is successfully established

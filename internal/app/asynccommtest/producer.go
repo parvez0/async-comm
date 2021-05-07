@@ -28,8 +28,10 @@ func (a *App) InitiateProducer(ctx context.Context, ru Routine, app string, wg *
 			a.log.Infof("Posting %s", msg)
 			res, err := a.aclib.Push(ru.Q, []byte(msg))
 			if err != nil {
-				a.log.Errorf("failed to push message on stream '%s': %s", ru.Q, err.Error())
+				a.log.Infof("Failed Posting %s", msg)
+				a.log.Debugf("failed to push message on stream '%s': %s", ru.Q, err.Error())
 			} else {
+				a.log.Infof("Posted %s Successfully", msg)
 				a.log.Debugf("messaged pushed generated  { q: %s, id: %s }", ru.Q, res)
 			}
 			time.Sleep(time.Duration(ru.Message.Freq) * time.Millisecond)

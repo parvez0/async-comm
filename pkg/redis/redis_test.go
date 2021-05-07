@@ -50,17 +50,38 @@ func Test_RedisCreateGroup(t *testing.T)  {
 	assert.Nil(t, err)
 }
 
-func Test_RedisConsumer(t *testing.T) {
-	for i := 0; i < 5; i++ {
-		wrk := Consumers[i%2]
-		t.Run(fmt.Sprintf("%s_%d", wrk, i), func(t *testing.T) {
-			res, id, err := rdb.Consume(context.TODO(), Q, wrk)
-			if err != nil {
-				t.Fatal(err)
-			}
-			t.Logf("recieved response from queue { msg: %s, id: %s }", res, id)
-		})
+func Test_RedisConsumerAndAck(t *testing.T) {
+	var ids []string
+	t.Run("RedisConsumer", func(t *testing.T) {
+		for i := 0; i < 5; i++ {
+			wrk := Consumers[i%2]
+			t.Run(fmt.Sprintf("%s_%d", wrk, i), func(t *testing.T) {
+				res, id, err := rdb.Consume(Q, wrk, 200)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Logf("recieved response from queue { msg: %s, id: %s }", res, id)
+				ids = append(ids, id)
+			})
+		}
+	})
+	t.Run("AcknowledgeMessages", func(t *testing.T) {
+		err := rdb.Ack(Q, ids...)
+		assert.Nil(t, err)
+	})
+}
+
+func TestRedis_GetQStats(t *testing.T) {
+	opts := redis.QStatusOptions{
+		Q:        Q,
+		Consumer: true,
+		Groups:   true,
 	}
+	exp := redis.QStatus{}
+	status, err := rdb.GetQStats(opts)
+	assert.Nil(t, err)
+	t.Logf("stats info : %#v", status)
+	assert.NotEqual(t, status, exp)
 }
 
 func Test_RedisDestroyGroup(t *testing.T) {

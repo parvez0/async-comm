@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/viper"
 	"os"
 	"path"
-	"sync"
 	"time"
 )
 
@@ -16,7 +15,7 @@ import (
 type Config struct {
 	App      AppConf      `json:"application" mapstructure:"application"`
 	Redis    RedisConf    `json:"redis" mapstructure:"redis"`
-	AcLogger AcLoggerConf `json:"logger" mapstructure:"logger"`
+	AcLogger AcLoggerConf `json:"ac_logger" mapstructure:"ac_logger"`
 	Logger   struct{
 		Level string `json:"level" mapstructure:"level"`
 		FullTimestamp bool `json:"full_timestamp" mapstructure:"full_timestamp"`
@@ -26,6 +25,7 @@ type Config struct {
 
 type AppConf struct {
 	App      string    `json:"app" mapstructure:"app"`
+	ClaimTime int      `json:"claim_time" mapstructure:"claim_time"`
 	Routines []Routine `json:"routines" mapstructure:"routines"`
 }
 
@@ -70,13 +70,9 @@ var config *Config
 // config from multiple sources such as json, yaml, toml and
 // even environment variables, it returns a pointer to Config
 func InitializeConfig() *Config {
-	mutex := sync.Mutex{}
 	if config != nil {
 		return config
 	}
-
-	mutex.Lock()
-	defer mutex.Unlock()
 
 	// set the file name of the configurations file
 	viper.SetConfigName("config")
@@ -104,11 +100,12 @@ func InitializeConfig() *Config {
 
 	// Set undefined variables
 	viper.SetDefault("application.app", hostname)
+	viper.SetDefault("application.claim_time", 5000)
 	viper.SetDefault("db.host", "localhost")
 	viper.SetDefault("db.port", "3306")
 	viper.SetDefault("db.username", "")
-	viper.SetDefault("logger.level", "info")
-	viper.SetDefault("logger.full_timestamp", true)
+	viper.SetDefault("app_logger.level", "info")
+	viper.SetDefault("app_logger.full_timestamp", true)
 
 	err := viper.Unmarshal(&config)
 	if err != nil {

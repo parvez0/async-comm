@@ -41,7 +41,7 @@ func TestAsyncComm_SetLogLevel(t *testing.T) {
 }
 
 func TestAsyncComm_ConsumeMessageFailure(t *testing.T) {
-	_, _, err := ac.Pull(context.TODO(), Q, Consumer, RefreshTime)
+	_, _, err := ac.Pull(context.TODO(), Q, Consumer)
 	assert.NotNil(t, err)
 }
 
@@ -70,7 +70,7 @@ func TestAsyncComm_Pull(t *testing.T) {
 	for i:=0; i < 5; i++ {
 		t.Run(fmt.Sprintf("Consuming_Message_%d", i), func(t *testing.T) {
 			c := fmt.Sprintf("%s_%d", Consumer, i%2)
-			msg, id, err := ac.Pull(context.TODO(), Q, c, RefreshTime)
+			msg, id, err := ac.Pull(context.TODO(), Q, c)
 			assert.Nil(t, err)
 			t.Logf("message consumed Id: %s, data : %s", id, string(msg))
 			ids = append(ids, id)

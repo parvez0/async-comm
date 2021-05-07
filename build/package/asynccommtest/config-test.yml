@@ -25,7 +25,7 @@ application:
       name: producerA
       message:
         format: "{{.App}}-{{.Producer}}-{{.Time}}"
-        freq: 1000
+        freq: 5000
     - role: consumer
       q: req-a-q
       name: consumerA
