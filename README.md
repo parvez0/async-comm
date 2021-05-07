@@ -85,7 +85,7 @@ $ cd build/package/asynccommtest
 $ docker-compose up -d
 ```
 
-##Configuration
+## Configuration
 This library uses Viper to manage configuration which can take the input from Json, yaml or toml files and can
 dynamically parse environment variables into the config file. The basic structure of config is given below
 
