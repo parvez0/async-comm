@@ -188,7 +188,7 @@ func (ac *AsyncComm) syncConsumer(c *Consumer)  {
 			if c.Name == os.Getenv("TEST_CONSUMER") {
 				return
 			}
-			sts, err := ac.Rdb.Set("active_consumer_" + c.Name, time.Now().String(), c.RefreshInterval * time.Millisecond)
+			sts, err := ac.Rdb.Set("active_consumers_" + c.Name, time.Now().String(), c.RefreshInterval * time.Millisecond)
 			if err != nil {
 				ac.Log.Panicf("failed to register consumer %s - %s", c.Name, err.Error())
 			}
