@@ -29,7 +29,7 @@ install: system-check
 
 run:
 	@echo "starting application"
-	@go run internal/app/asynccommtest/main.go
+	@go run internal/app/asynccommtest/
 
 tag:
 	@echo "creating tag $(TAG)"

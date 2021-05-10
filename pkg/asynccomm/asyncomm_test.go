@@ -41,8 +41,21 @@ func TestAsyncComm_SetLogLevel(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestAsyncComm_DeleteQIfExits(t *testing.T) {
+	ac.DeleteQ(Q)
+}
+
+func TestAsyncComm_RegisterConsumer(t *testing.T) {
+	c := asynccomm.Consumer{
+		Name: NewConsumer,
+		RefreshInterval: 200,
+	}
+	ac.RegisterConsumer(context.TODO(), c)
+}
+
 func TestAsyncComm_ConsumeMessageFailure(t *testing.T) {
 	_, _, err := ac.Pull(Q, Consumer, 100)
+	t.Log(fmt.Sprintf("ConsumeMessageFialureError : %+v", err))
 	assert.NotNil(t, err)
 }
 
@@ -67,7 +80,7 @@ func TestAsyncComm_Push(t *testing.T) {
 	}
 }
 
-func TestAsyncComm_Register_DeRegister_Consumer(t *testing.T) {
+func TestAsyncComm_ResourceRecovery_Consumer(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	for i := 0; i < 2; i++ {
 		t.Run("RegisterConsumer-"+Consumer + strconv.Itoa(i), func(t *testing.T) {
@@ -116,7 +129,7 @@ func TestAsyncComm_Ack(t *testing.T) {
 }
 
 func TestAsyncComm_Pending(t *testing.T)  {
-	msgs, _, err := ac.PendingMessages(Q)
+	msgs, _, err := ac.PendingMessages(Q, 100)
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(msgs), msgs)
 }

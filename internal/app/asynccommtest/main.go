@@ -61,6 +61,7 @@ func main()  {
 				ClaimInterval:   time.Duration(r.ClaimTime),
 				BlockTime:       time.Duration(r.BlockTime),
 				RefreshInterval: time.Duration(r.RefreshTime),
+				MsgIdleDuration: time.Duration(r.MsgIdleTime),
 				Wg:              wg,
 			}
 			cApp.aclib.RegisterConsumer(ctx, cns)

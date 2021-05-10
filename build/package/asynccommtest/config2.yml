@@ -21,7 +21,7 @@ application:
   app: App-B
   routines:
     - role: consumer
-      q: req-a-q
+      q: req-b-q
       name: consumerA
       processing_time: 500
       refresh_time: 5000

@@ -63,6 +63,7 @@ type Routine struct {
 	RefreshTime    int `json:"refresh_time,omitempty" mapstructure:"refresh_time"`
 	ClaimTime      int `json:"claim_time" mapstructure:"claim_time"`
 	BlockTime      int `json:"block_time" mapstructure: "block_time"`
+	MsgIdleTime    int `json:"msg_idle_time" mapstructure:"msg_idle_time"`
 }
 
 var config *Config

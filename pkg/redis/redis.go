@@ -268,16 +268,16 @@ func (r *Redis) DeleteQ(q string) error {
 	return nil
 }
 
-func (r *Redis) PendingStreamMessages(q string) (map[string][]string, int, error) {
+func (r *Redis) PendingStreamMessages(q string, idleTime time.Duration) (map[string][]string, int, error) {
 	grp := q + DefaultConsumerGrpSuf
-	args := &redis.XPendingExtArgs{
+	args := redis.XPendingExtArgs{
 		Stream:   q,
 		Group:    grp,
-		Start: 	  "-",
+		Start:    "-",
 		End:      "+",
-		Count: 	  100,
+		Count:    100,
 	}
-	cmd := r.RdbCon.XPendingExt(r.Ctx, args)
+	cmd := r.RdbCon.XPendingExt(context.TODO(), &args)
 	pending, err := cmd.Result()
 	if err != nil {
 		return nil, 0, err
@@ -293,23 +293,23 @@ func (r *Redis) PendingStreamMessages(q string) (map[string][]string, int, error
 	return res, msgCount, nil
 }
 
-func (r *Redis) ClaimPendingMessages(q, consumer string) error  {
-	msgs, _, err := r.PendingStreamMessages(q)
+func (r *Redis) ClaimPendingMessages(q, consumer string, msgIdleTime time.Duration) error  {
+	msgs, _, err := r.PendingStreamMessages(q, msgIdleTime)
 	if err != nil {
 		r.Log.Errorf("failed to fetch pending messages { q: %s, consumer: %s, error: %s}", q, consumer, err.Error())
 		return err
 	}
 	var errors []error
-	var processedMsgs []string
 	for k, ids := range msgs {
-		if _, err := r.Get("active_consumers_" + k); err != nil {
+		if _, err := r.Get("active_consumers_" + k); err != nil && err.Error() == "redis: nil" {
 			if len(ids) > 0 {
 				err := r.claimMessages(q, consumer, ids[0])
 				if err != nil {
 					errors = append(errors, fmt.Errorf("claimed failed! { inActiveConsumer: %s, err : %s }", k, err.Error()))
 				}
 				r.Log.Debugf("messages claimed! { inActiveConsumer: %s, newConsumer: %s, msgId: %s }", k, consumer, ids[0])
-				processedMsgs = append(processedMsgs, ids[0])
+				// returning after one successful claim by the current consumer
+				return nil
 			}
 		}
 	}
@@ -402,7 +402,6 @@ func (r *Redis) claimMessages(q,  consumer string, msgId... string) error {
 		Stream:    q,
 		Group:     grp,
 		Consumer:  consumer,
-		MinIdle:   20000,
 		Messages:  msgId,
 	}
 	cmd := r.RdbCon.XClaim(r.Ctx, args)

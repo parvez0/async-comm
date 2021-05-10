@@ -13,7 +13,7 @@ app_logger:
 
 # ac library logger configuration
 ac_logger:
-  level: warn
+  level: debug
   output_file_path: ""
 
 # application information
@@ -25,23 +25,18 @@ application:
       name: producerA
       message:
         format: "{{.App}}-{{.Producer}}-{{.Time}}"
-        freq: 1000
+        freq: 100
     - role: consumer
       q: req-a-q
       name: consumerX
       processing_time: 1000
       refresh_time: 5000
-      claim_time: 5000
+      claim_time: 500
       block_time: 200
     - role: consumer
       q: req-a-q
       name: consumerY
       processing_time: 1000
-      refresh_time: 5000
+      refresh_time: 500
       block_time: 200
-    - role: consumer
-      q: req-a-q
-      name: consumerZ
-      processing_time: 1000
-      refresh_time: 5000
-      block_time: 200
+      msg_idle_time: 500

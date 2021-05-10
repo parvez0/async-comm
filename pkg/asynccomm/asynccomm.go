@@ -13,6 +13,7 @@ import (
 const (
 	ConsumerClaimInterval=5000
 	ConsumerRefreshInterval=5000
+	ConsumerMsgIdleDuration=5000
 	ConsumerBlockTime=300
 )
 
@@ -27,6 +28,7 @@ type Consumer struct {
 	ClaimInterval       time.Duration
 	BlockTime       	time.Duration
 	RefreshInterval 	time.Duration
+	MsgIdleDuration     time.Duration
 	Wg					*sync.WaitGroup
 	ctx 				context.Context
 	cancel 				context.CancelFunc
@@ -83,7 +85,11 @@ func (ac *AsyncComm) CreateQ(q string, persistent bool) error {
 }
 
 func (ac *AsyncComm) ClaimPendingMessages(q, consumer string) error {
-	return ac.Rdb.ClaimPendingMessages(q, consumer)
+	c, _ := ac.getConsumer(consumer)
+	if c == nil {
+		return fmt.Errorf("consumer '%s' not registered", consumer)
+	}
+	return ac.Rdb.ClaimPendingMessages(q, consumer, c.MsgIdleDuration)
 }
 
 func (ac *AsyncComm) DeleteQ(q string) error {
@@ -94,8 +100,8 @@ func (ac *AsyncComm) FlushQ(q string) error {
 	return ac.Rdb.DeleteStream(q)
 }
 
-func (ac *AsyncComm) PendingMessages(q string) (map[string][]string, int, error) {
-	return ac.Rdb.PendingStreamMessages(q)
+func (ac *AsyncComm) PendingMessages(q string, idleTime time.Duration) (map[string][]string, int, error) {
+	return ac.Rdb.PendingStreamMessages(q, idleTime)
 }
 
 func (ac *AsyncComm) GroupExists(q string) bool {
@@ -119,6 +125,9 @@ func (ac *AsyncComm) RegisterConsumer(ctx context.Context, c Consumer) error {
 	}
 	if c.ClaimInterval == 0 {
 		c.ClaimInterval = ConsumerClaimInterval
+	}
+	if c.MsgIdleDuration == 0 {
+		c.MsgIdleDuration = ConsumerMsgIdleDuration
 	}
 	if c.Wg == nil {
 		c.Wg = new(sync.WaitGroup)
