@@ -29,7 +29,11 @@ func FormatTime(t time.Time) string {
 }
 
 func GetCurTime() string {
-	t := time.Now()
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		log.Errorf("failed to load location 'Asia/Kolkata': %s", err.Error())
+	}
+	t := time.Now().In(loc)
 	return FormatTime(t)
 }
 
@@ -54,7 +58,9 @@ func GetTimeFromString(msg string) (t time.Time) {
 	secPrts := strings.Split(prts[4], ".")
 	sec, _ := strconv.Atoi(secPrts[0])
 	mill, _ := strconv.Atoi(secPrts[1])
-	t = time.Date(time.Now().Year(), time.Month(mnth), day, hr, min, sec, int(time.Duration(mill)*time.Millisecond), loc)
+	ns := int(time.Duration(mill)*time.Millisecond)
+	t = time.Date(time.Now().Year(), time.Month(mnth), day, hr, min, sec, ns, loc)
+	log.Warnf("prts: %+v, sec: %d, mill: %d, nanoSc: %d, time: %s", prts, sec, mill, ns, FormatTime(t))
 	return t
 }
 
