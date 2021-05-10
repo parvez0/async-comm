@@ -13,7 +13,7 @@ app_logger:
 
 # ac library logger configuration
 ac_logger:
-  level: panic
+  level: warn
   output_file_path: ""
 
 # application information

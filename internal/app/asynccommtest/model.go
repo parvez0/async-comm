@@ -60,7 +60,6 @@ func GetTimeFromString(msg string) (t time.Time) {
 	mill, _ := strconv.Atoi(secPrts[1])
 	ns := int(time.Duration(mill)*time.Millisecond)
 	t = time.Date(time.Now().Year(), time.Month(mnth), day, hr, min, sec, ns, loc)
-	log.Warnf("prts: %+v, sec: %d, mill: %d, nanoSc: %d, time: %s", prts, sec, mill, ns, FormatTime(t))
 	return t
 }
 

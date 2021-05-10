@@ -107,7 +107,7 @@ func (ac *AsyncComm) GroupExists(q string) bool {
 	return exists
 }
 
-func (ac *AsyncComm) RegisterConsumer(c Consumer) error {
+func (ac *AsyncComm) RegisterConsumer(ctx context.Context, c Consumer) error {
 	if c.Name == "" {
 		return fmt.Errorf("consumer name is required for creating new consumer")
 	}
@@ -125,7 +125,7 @@ func (ac *AsyncComm) RegisterConsumer(c Consumer) error {
 	}
 	syncTime := time.Now().Add(c.RefreshInterval * time.Millisecond)
 	c.lastSync = &syncTime
-	c.ctx, c.cancel = context.WithCancel(ac.Rdb.Ctx)
+	c.ctx, c.cancel = context.WithCancel(ctx)
 	go ac.syncConsumer(&c)
 	lock.Lock()
 	defer lock.Unlock()
@@ -134,9 +134,11 @@ func (ac *AsyncComm) RegisterConsumer(c Consumer) error {
 }
 
 func (ac *AsyncComm) DeRegisterConsumer(consumer string) error {
-	c := ac.getConsumer(consumer)
+	c, i := ac.getConsumer(consumer)
 	if c != nil {
 		c.cancel()
+		ac.removeConsumer(i)
+		ac.Log.Debugf("deRegistered consumer '%s', new consumer list : %v", c.Name, ac.consumers)
 		return nil
 	}
 	return fmt.Errorf("no such registered consumer '%s'", consumer)
@@ -149,7 +151,7 @@ func (ac *AsyncComm) GetQStats(opts redis.QStatusOptions) (redis.QStatus, error)
 func (ac *AsyncComm) getStartTime(consumer string) (*time.Time, error) {
 	lock.RLock()
 	defer lock.RUnlock()
-	c := ac.getConsumer(consumer)
+	c, _ := ac.getConsumer(consumer)
 	if c != nil {
 		return c.lastSync, nil
 	}
@@ -159,7 +161,7 @@ func (ac *AsyncComm) getStartTime(consumer string) (*time.Time, error) {
 func (ac *AsyncComm) setStartTime(consumer string) *time.Time {
 	lock.Lock()
 	defer lock.Unlock()
-	c := ac.getConsumer(consumer)
+	c, _ := ac.getConsumer(consumer)
 	if c != nil {
 		syncTime := time.Now().Add(c.RefreshInterval * time.Millisecond)
 		c.lastSync = &syncTime
@@ -169,13 +171,21 @@ func (ac *AsyncComm) setStartTime(consumer string) *time.Time {
 	return &syncTime
 }
 
-func (ac *AsyncComm) getConsumer(consumer string) *Consumer  {
-	for _, c := range ac.consumers {
+func (ac *AsyncComm) getConsumer(consumer string) (*Consumer, int)  {
+	for i, c := range ac.consumers {
 		if c.Name == consumer {
-			return &c
+			return &c, i
 		}
 	}
-	return nil
+	return nil, 0
+}
+
+func (ac *AsyncComm) removeConsumer(i int)  {
+	lock.Lock()
+	defer lock.Unlock()
+	cns := ac.consumers
+	cns[len(cns)-1], cns[i] = cns[i], cns[len(cns)-1]
+	ac.consumers = cns[:len(cns)-1]
 }
 
 func (ac *AsyncComm) syncConsumer(c *Consumer)  {
@@ -183,6 +193,7 @@ func (ac *AsyncComm) syncConsumer(c *Consumer)  {
 	for {
 		select {
 		case <-c.ctx.Done():
+			ac.Log.Warnf("sigterm received stopping consumer '%s' and releasing all resources.", c.Name)
 			return
 		default:
 			if c.Name == os.Getenv("TEST_CONSUMER") {
@@ -194,7 +205,7 @@ func (ac *AsyncComm) syncConsumer(c *Consumer)  {
 			}
 			refreshTime := c.RefreshInterval - (c.RefreshInterval/10)
 			ac.Log.Infof("consumer '%s' registered with refreshTime: '%dms', status: '%s'", c.Name, refreshTime, sts)
-			time.Sleep(time.Duration(refreshTime) * time.Millisecond)
+			time.Sleep(refreshTime * time.Millisecond)
 		}
 	}
 }

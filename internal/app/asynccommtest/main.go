@@ -63,7 +63,7 @@ func main()  {
 				RefreshInterval: time.Duration(r.RefreshTime),
 				Wg:              wg,
 			}
-			cApp.aclib.RegisterConsumer(cns)
+			cApp.aclib.RegisterConsumer(ctx, cns)
 			go cApp.InitiateConsumers(ctx, r, wg)
 		}
 	}

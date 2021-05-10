@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -68,19 +69,24 @@ func TestAsyncComm_Push(t *testing.T) {
 
 func TestAsyncComm_Register_DeRegister_Consumer(t *testing.T) {
 	wg := new(sync.WaitGroup)
-	t.Run("RegisterConsumer", func(t *testing.T) {
-		c := asynccomm.Consumer{
-			Name: Consumer,
-			RefreshInterval: 200,
-			Wg: wg,
-		}
-		wg.Add(1)
-		ac.RegisterConsumer(c)
-	})
-	t.Run("DeRegisterConsumer", func(t *testing.T) {
-		ac.DeRegisterConsumer(Consumer)
-		wg.Wait()
-	})
+	for i := 0; i < 2; i++ {
+		t.Run("RegisterConsumer-"+Consumer + strconv.Itoa(i), func(t *testing.T) {
+			c := asynccomm.Consumer{
+				Name: Consumer + strconv.Itoa(i),
+				RefreshInterval: 200,
+				Wg: wg,
+			}
+			wg.Add(1)
+			ac.RegisterConsumer(c)
+		})
+	}
+	t.Log("waitGroup count: ", wg)
+	for i := 0; i < 2; i++ {
+		t.Run("DeRegisterConsumer-"+Consumer + strconv.Itoa(i), func(t *testing.T) {
+			ac.DeRegisterConsumer(Consumer + strconv.Itoa(i))
+		})
+	}
+	wg.Wait()
 }
 
 func TestAsyncComm_Pull(t *testing.T) {

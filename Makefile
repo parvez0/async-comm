@@ -1,12 +1,12 @@
 TAG=$(shell cat .release | cut -d'=' -f2)
 DEVELOPMENT_TAG=$(shell cat .development)
-BUILD_PATH="$(shell go env GOPATH)/bin/wabacli"
+BUILD_PATH="$(shell go env GOPATH)/bin/asynccomm"
 CONFIG_PATH="$(HOME)/.async_comm"
 .DEFAULT_GOAL := build
 
 build: system-check
 	@echo "starting build at $(BUILD_PATH) for tag $(DEVELOPMENT_TAG)"
-	@cd cmd/ && GOOS_VAL=$(shell go env GOOS) GOARCH_VAL=$(shell go env GOARCH) go build -ldflags="-X main.BuildVersion=$(DEVELOPMENT_TAG)" -o $(BUILD_PATH) main.go
+	@cd internal/app/asynccommtest/ && env GOOS_VAL=$(shell go env GOOS) GOARCH_VAL=$(shell go env GOARCH) go build -o $(BUILD_PATH) .
 	@echo "build successful"
 
 compose-up: docker-check docker-compose-check
@@ -56,4 +56,4 @@ test:
   	 else \
   	   echo "creating directory $(CONFIG_PATH)" && mkdir "$(CONFIG_PATH)" && cp config.yml "$(CONFIG_PATH)"; \
   	 fi
-	@go test -timeout 15s -v ./...
+	@go test -timeout 15s -failfast -v ./...
