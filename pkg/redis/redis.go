@@ -300,13 +300,17 @@ func (r *Redis) ClaimPendingMessages(q, consumer string) error  {
 		return err
 	}
 	var errors []error
+	var processedMsgs []string
 	for k, ids := range msgs {
 		if _, err := r.Get("active_consumers_" + k); err != nil {
-			err := r.claimMessages(q, consumer, ids...)
-			if err != nil {
-				errors = append(errors, fmt.Errorf("claimed failed! { inActiveConsumer: %s, err : %s }", k, err.Error()))
+			if len(ids) > 0 {
+				err := r.claimMessages(q, consumer, ids[0])
+				if err != nil {
+					errors = append(errors, fmt.Errorf("claimed failed! { inActiveConsumer: %s, err : %s }", k, err.Error()))
+				}
+				r.Log.Debugf("messages claimed! { inActiveConsumer: %s, newConsumer: %s, msgId: %s }", k, consumer, ids[0])
+				processedMsgs = append(processedMsgs, ids[0])
 			}
-			r.Log.Debugf("messages claimed! { inActiveConsumer: %s, newConsumer: %s }", k, consumer)
 		}
 	}
 	if len(errors) > 0 {
@@ -408,15 +412,6 @@ func (r *Redis) claimMessages(q,  consumer string, msgId... string) error {
 	}
 	r.Log.Debugf("message claimed - %#v", msg)
 	return nil
-}
-
-// syncConsumers fetches all the pending messages in
-// the stream and check if there consumer is alive
-// by verifying it with the sync queue. if the consumer
-// is not present in the queue a request will be raised
-// by this consumer to claim that message using XClaim
-func (r *Redis) syncConsumers() {
-
 }
 
 // onConnect informs if the connection is successfully established

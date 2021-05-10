@@ -49,7 +49,7 @@ func (a *App) DeleteQ(q string) error {
 // returned upon success other wise it will return a non nil error
 func ParseTemplate(r *Routine, app string) (string, error) {
 	cur := GetCurTime()
-	msg := ProducerMessage{
+	msg := Message{
 		App:      app,
 		Producer: r.Name,
 		Time:     cur,

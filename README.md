@@ -123,7 +123,9 @@ application:
       q: req-a-q
       name: consumerX
       processing_time: 1000
-      refresh_time: 5000
+      refresh_time: 5000             # time interval for refreshing consumer status
+      claim_time: 5000               # time interval for claiming the failed consumers messages
+      block_time: 300                # time to wait for a new message if q is empty
 ```
 If you want to provide a field in environment variable Keys should be conjunction with '.' separator. for example you can 
 provide the redis host and port by exporting environment variables like this

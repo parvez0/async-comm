@@ -25,7 +25,6 @@ type Config struct {
 
 type AppConf struct {
 	App      string    `json:"app" mapstructure:"app"`
-	ClaimTime int      `json:"claim_time" mapstructure:"claim_time"`
 	Routines []Routine `json:"routines" mapstructure:"routines"`
 }
 
@@ -62,6 +61,8 @@ type Routine struct {
 	} `json:"message,omitempty" mapstructure:"message"`
 	ProcessingTime int `json:"processing_time,omitempty" mapstructure:"processing_time"`
 	RefreshTime    int `json:"refresh_time,omitempty" mapstructure:"refresh_time"`
+	ClaimTime      int `json:"claim_time" mapstructure:"claim_time"`
+	BlockTime      int `json:"block_time" mapstructure: "block_time"`
 }
 
 var config *Config
@@ -100,9 +101,8 @@ func InitializeConfig() *Config {
 
 	// Set undefined variables
 	viper.SetDefault("application.app", hostname)
-	viper.SetDefault("application.claim_time", 5000)
 	viper.SetDefault("redis.host", "localhost")
-	viper.SetDefault("redis.port", "3306")
+	viper.SetDefault("redis.port", "6379")
 	viper.SetDefault("redis.username", "")
 	viper.SetDefault("redis.password", "")
 	viper.SetDefault("app_logger.level", "info")

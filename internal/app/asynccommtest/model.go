@@ -58,7 +58,7 @@ func GetTimeFromString(msg string) (t time.Time) {
 	return t
 }
 
-type ProducerMessage struct {
+type Message struct {
 	App string
 	Producer string
 	Time string

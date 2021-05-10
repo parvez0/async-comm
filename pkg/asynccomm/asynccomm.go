@@ -10,13 +10,27 @@ import (
 	"time"
 )
 
-const DefaultConsumerGroup = "-consumer-group"
+const (
+	ConsumerClaimInterval=5000
+	ConsumerRefreshInterval=5000
+	ConsumerBlockTime=300
+)
 
 type AsyncComm struct {
 	Rdb *redis.Redis
 	Log logger.Logger
-	ClaimTime int
-	startTimes map[string]time.Time
+	consumers []Consumer
+}
+
+type Consumer struct {
+	Name 		string
+	ClaimInterval       time.Duration
+	BlockTime       	time.Duration
+	RefreshInterval 	time.Duration
+	Wg					*sync.WaitGroup
+	ctx 				context.Context
+	cancel 				context.CancelFunc
+	lastSync       		*time.Time
 }
 
 var lock = sync.RWMutex{}
@@ -24,7 +38,7 @@ var lock = sync.RWMutex{}
 // NewAC creates a asyncComm library instance for managing
 // async message methods like push, pull etc
 func NewAC(rdb *redis.Redis) (*AsyncComm, error) {
-	return &AsyncComm{Rdb: rdb, Log: rdb.Log, startTimes: make(map[string]time.Time)}, nil
+	return &AsyncComm{Rdb: rdb, Log: rdb.Log}, nil
 }
 
 // SetLogLevel provides different log levels for the async library
@@ -49,7 +63,7 @@ func (ac *AsyncComm) Pull(q, consumer string, block time.Duration) ([]byte, stri
 	if err != nil {
 		tm = ac.setStartTime(consumer)
 	}
-	if time.Now().After(tm) {
+	if time.Now().After(*tm) {
 		err := ac.ClaimPendingMessages(q, consumer)
 		if err != nil {
 			ac.Log.Errorf("failed to claim pending messages for stream '%s' by consumer '%s': %s", q, consumer, err.Error())
@@ -87,57 +101,102 @@ func (ac *AsyncComm) PendingMessages(q string) (map[string][]string, int, error)
 func (ac *AsyncComm) GroupExists(q string) bool {
 	exists, err := ac.Rdb.GrpExists(q)
 	if err != nil {
-		ac.Log.Debugf("encountered error verifying group ! { q: %s, grp: %s, err: %s}", q, q + DefaultConsumerGroup, err.Error())
+		ac.Log.Debugf("encountered error verifying group ! { q: %s, err: %s}", q, err.Error())
 		return false
 	}
 	return exists
 }
 
-func (ac *AsyncComm) RegisterConsumer(ctx context.Context, cnsmr string, rTime, claimTime int, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			ac.ClaimTime = claimTime
-			if cnsmr == os.Getenv("TEST_CONSUMER") {
-				return
-			}
-			sts, err := ac.Rdb.Set("active_consumer_" + cnsmr, time.Now().String(), time.Duration(rTime) * time.Millisecond)
-			if err != nil {
-				ac.Log.Panicf("failed to register consumer %s - %s", cnsmr, err.Error())
-			}
-			refreshTime := rTime - (rTime/10)
-			ac.Log.Infof("consumer '%s' registered with refreshTime: '%dms', status: '%s'", cnsmr, refreshTime, sts)
-			time.Sleep(time.Duration(refreshTime) * time.Millisecond)
-		}
+func (ac *AsyncComm) RegisterConsumer(c Consumer) error {
+	if c.Name == "" {
+		return fmt.Errorf("consumer name is required for creating new consumer")
 	}
+	if c.RefreshInterval == 0 {
+		c.RefreshInterval = ConsumerRefreshInterval
+	}
+	if c.BlockTime == 0 {
+		c.BlockTime = ConsumerBlockTime
+	}
+	if c.ClaimInterval == 0 {
+		c.ClaimInterval = ConsumerClaimInterval
+	}
+	if c.Wg == nil {
+		c.Wg = new(sync.WaitGroup)
+	}
+	syncTime := time.Now().Add(c.RefreshInterval * time.Millisecond)
+	c.lastSync = &syncTime
+	c.ctx, c.cancel = context.WithCancel(ac.Rdb.Ctx)
+	go ac.syncConsumer(&c)
+	lock.Lock()
+	defer lock.Unlock()
+	ac.consumers = append(ac.consumers, c)
+	return nil
+}
+
+func (ac *AsyncComm) DeRegisterConsumer(consumer string) error {
+	c := ac.getConsumer(consumer)
+	if c != nil {
+		c.cancel()
+		return nil
+	}
+	return fmt.Errorf("no such registered consumer '%s'", consumer)
 }
 
 func (ac *AsyncComm) GetQStats(opts redis.QStatusOptions) (redis.QStatus, error) {
 	return ac.Rdb.GetQStats(opts)
 }
 
-func (ac *AsyncComm) getStartTime(consumer string) (time.Time, error) {
+func (ac *AsyncComm) getStartTime(consumer string) (*time.Time, error) {
 	lock.RLock()
 	defer lock.RUnlock()
-	if val, ok := ac.startTimes[consumer]; ok {
-		return val, nil
+	c := ac.getConsumer(consumer)
+	if c != nil {
+		return c.lastSync, nil
 	}
-	return time.Time{}, fmt.Errorf("initial claimTime not set for consumer: %s", consumer)
+	return nil, fmt.Errorf("initial claimTime not set for consumer: %s", consumer)
 }
 
-func (ac *AsyncComm) setStartTime(consumer string) time.Time {
-	if ac.ClaimTime == 0 {
-		ac.ClaimTime = 5000
-	}
-	now := time.Now().Add(time.Duration(ac.ClaimTime) * time.Millisecond)
+func (ac *AsyncComm) setStartTime(consumer string) *time.Time {
 	lock.Lock()
 	defer lock.Unlock()
-	ac.startTimes[consumer] = now
-	ac.Log.Debugf("refreshed next claimTime : %s", now.String())
-	return now
+	c := ac.getConsumer(consumer)
+	if c != nil {
+		syncTime := time.Now().Add(c.RefreshInterval * time.Millisecond)
+		c.lastSync = &syncTime
+		return &syncTime
+	}
+	syncTime := time.Now().Add(5000 * time.Millisecond)
+	return &syncTime
+}
+
+func (ac *AsyncComm) getConsumer(consumer string) *Consumer  {
+	for _, c := range ac.consumers {
+		if c.Name == consumer {
+			return &c
+		}
+	}
+	return nil
+}
+
+func (ac *AsyncComm) syncConsumer(c *Consumer)  {
+	defer c.Wg.Done()
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+			if c.Name == os.Getenv("TEST_CONSUMER") {
+				return
+			}
+			sts, err := ac.Rdb.Set("active_consumer_" + c.Name, time.Now().String(), c.RefreshInterval * time.Millisecond)
+			if err != nil {
+				ac.Log.Panicf("failed to register consumer %s - %s", c.Name, err.Error())
+			}
+			refreshTime := c.RefreshInterval - (c.RefreshInterval/10)
+			ac.Log.Infof("consumer '%s' registered with refreshTime: '%dms', status: '%s'", c.Name, refreshTime, sts)
+			time.Sleep(time.Duration(refreshTime) * time.Millisecond)
+		}
+	}
 }
 
 func (ac *AsyncComm) Close()  {

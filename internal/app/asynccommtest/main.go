@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 )
 
 var cnf *Config
@@ -55,7 +56,14 @@ func main()  {
 		case "consumer":
 			wg.Add(2)
 			// Reviewed changes: registering consumer with keep alive at every r.RefreshTime interval
-			go pApp.aclib.RegisterConsumer(ctx, r.Name, r.RefreshTime, cnf.App.ClaimTime, wg)
+			cns := asynccomm.Consumer{
+				Name:            r.Name,
+				ClaimInterval:   time.Duration(r.ClaimTime),
+				BlockTime:       time.Duration(r.BlockTime),
+				RefreshInterval: time.Duration(r.RefreshTime),
+				Wg:              wg,
+			}
+			cApp.aclib.RegisterConsumer(cns)
 			go cApp.InitiateConsumers(ctx, r, wg)
 		}
 	}

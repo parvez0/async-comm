@@ -19,7 +19,6 @@ ac_logger:
 # application information
 application:
   app: App-A
-  claim_time: 2000
   routines:
     - role: producer
       q: req-a-q #group req-q-consumer-group
@@ -32,13 +31,17 @@ application:
       name: consumerX
       processing_time: 1000
       refresh_time: 5000
+      claim_time: 5000
+      block_time: 200
     - role: consumer
       q: req-a-q
       name: consumerY
       processing_time: 1000
       refresh_time: 5000
+      block_time: 200
     - role: consumer
       q: req-a-q
       name: consumerZ
       processing_time: 1000
       refresh_time: 5000
+      block_time: 200

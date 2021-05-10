@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
 	"time"
 )
@@ -65,6 +66,23 @@ func TestAsyncComm_Push(t *testing.T) {
 	}
 }
 
+func TestAsyncComm_Register_DeRegister_Consumer(t *testing.T) {
+	wg := new(sync.WaitGroup)
+	t.Run("RegisterConsumer", func(t *testing.T) {
+		c := asynccomm.Consumer{
+			Name: Consumer,
+			RefreshInterval: 200,
+			Wg: wg,
+		}
+		wg.Add(1)
+		ac.RegisterConsumer(c)
+	})
+	t.Run("DeRegisterConsumer", func(t *testing.T) {
+		ac.DeRegisterConsumer(Consumer)
+		wg.Wait()
+	})
+}
+
 func TestAsyncComm_Pull(t *testing.T) {
 	for i:=0; i < 5; i++ {
 		t.Run(fmt.Sprintf("Consuming_Message_%d", i), func(t *testing.T) {
@@ -78,8 +96,12 @@ func TestAsyncComm_Pull(t *testing.T) {
 }
 
 func TestAsyncComm_ClaimPendingMessages(t *testing.T) {
-	err := ac.ClaimPendingMessages(Q, NewConsumer)
-	assert.Nil(t, err)
+	for _, id := range ids {
+		t.Run("ClaimingMessage-" + id, func(t *testing.T) {
+			err := ac.ClaimPendingMessages(Q, NewConsumer)
+			assert.Nil(t, err)
+		})
+	}
 }
 
 func TestAsyncComm_Ack(t *testing.T) {
