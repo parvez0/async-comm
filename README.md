@@ -63,6 +63,7 @@ $ git clone https://github.com/kiran-anand14/async-comm
 
 After cloning the project you need to install the dependencies, for that run the below command
 ```bash
+$ cd async-comm
 $ go mod download
 ```
 By running this command it will download all the dependent libraries and stores it in your Gopath folder.
