@@ -33,7 +33,9 @@ func (ac *AsyncComm) Pull(q, consumer string, block time.Duration) ([]byte, stri
 
 func (ac *AsyncComm) Push(q string, msg []byte) (string, error)
 
-func (ac *AsyncComm) RegisterConsumer(ctx context.Context, cnsmr string, rTime, claimTime int, wg *sync.WaitGroup)
+func (ac *AsyncComm) RegisterConsumer(ctx context.Context, consumer asynccomm.Consumer) error
+
+func (ac *AsyncComm) DeRegisterConsumer(name string) error
 
 func (ac *AsyncComm) SetLogLevel(level string) error
 
