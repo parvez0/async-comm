@@ -77,7 +77,7 @@ func TestAsyncComm_Register_DeRegister_Consumer(t *testing.T) {
 				Wg: wg,
 			}
 			wg.Add(1)
-			ac.RegisterConsumer(c)
+			ac.RegisterConsumer(context.TODO(), c)
 		})
 	}
 	t.Log("waitGroup count: ", wg)

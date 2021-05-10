@@ -4,7 +4,7 @@ BUILD_PATH="$(shell go env GOPATH)/bin/asynccomm"
 CONFIG_PATH="$(HOME)/.async_comm"
 .DEFAULT_GOAL := build
 
-build: system-check
+build: system-check test
 	@echo "starting build at $(BUILD_PATH) for tag $(DEVELOPMENT_TAG)"
 	@cd internal/app/asynccommtest/ && env GOOS_VAL=$(shell go env GOOS) GOARCH_VAL=$(shell go env GOARCH) go build -o $(BUILD_PATH) .
 	@echo "build successful"
