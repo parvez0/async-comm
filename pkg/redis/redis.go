@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"net"
-	"strconv"
 	"time"
 )
 
@@ -159,11 +158,6 @@ func (r *Redis) Ack(q string, msgId... string) error {
 	if err != nil {
 		r.Log.Errorf("failed acknowledge { ids: %v, err: %s }", msgId, err.Error())
 		return err
-	}
-	cmd := r.RdbCon.IncrBy(r.Ctx, fmt.Sprintf("%s::%s::acknowledge", q, grp), int64(len(msgId)))
-	_, err = cmd.Result()
-	if err != nil {
-		r.Log.Debugf("failed to increment acknowledge counter { q: %s, grp: %s, error: %s }", q, grp, err.Error())
 	}
 	r.Log.Debugf("message acknowledge successfully for message %v - res : %d", msgId, res)
 	return nil
@@ -335,18 +329,6 @@ func (r *Redis) GetQStats(opts QStatusOptions) (QStatus, error) {
 	return status, nil
 }
 
-func (r *Redis) getAckMessagesInQ(q string) int64 {
-	grp := q + DefaultConsumerGrpSuf
-	key := fmt.Sprintf("%s::%s::acknowledge", q, grp)
-	cnt, err := r.Get(key)
-	if err != nil {
-		r.Log.Debugf("failed to fetch total count from increment key '%s': %s",key, err.Error())
-		return 0
-	}
-	acked, _ := strconv.Atoi(cnt)
-	return int64(acked)
-}
-
 func (r *Redis) getConsumerInfo(q string) []Consumer {
 	grp := q + DefaultConsumerGrpSuf
 	cmd := r.RdbCon.XInfoConsumers(r.Ctx, q, grp)
@@ -383,10 +365,8 @@ func (r *Redis) getStreamInfo(q string) (Info, error) {
 		r.Log.Debugf("failed to fetch stream info '%s': %s", q, err.Error())
 		return Info{}, err
 	}
-	ackMsgCount := r.getAckMessagesInQ(q)
 	return Info{
 		Length:          info.Length,
-		Acknowledged:    ackMsgCount,
 		RadixTreeKeys:   info.RadixTreeKeys,
 		RadixTreeNodes:  info.RadixTreeNodes,
 		LastGeneratedID: info.LastGeneratedID,

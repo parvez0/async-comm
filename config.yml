@@ -9,7 +9,7 @@ redis:
 app_logger:
   level: info
   full_timestamp: true
-  output_file_path: ""
+  output_file_path: "./logs/"
 
 # ac library logger configuration
 ac_logger:

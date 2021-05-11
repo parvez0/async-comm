@@ -9,12 +9,12 @@ redis:
 app_logger:
   level: info
   full_timestamp: true
-  output_file_path: ""
+  output_file_path: "/etc/app.log"
 
 # ac library logger configuration
 ac_logger:
   level: debug
-  output_file_path: ""
+  output_file_path: "/etc/ac_lib.log"
 
 # application information
 application:

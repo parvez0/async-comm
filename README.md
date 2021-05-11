@@ -212,7 +212,6 @@ Response QStatus:
 redis.QStatus{
 	Info:redis.Info{
 		Length:5,                // total messages in the q
-		Acknowledged:5,          // acknowledge messages
 		RadixTreeKeys:1, 
 		RadixTreeNodes:2, 
 		LastGeneratedID:"1620421718593-0", 
