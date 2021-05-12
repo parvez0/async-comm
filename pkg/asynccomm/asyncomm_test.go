@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
@@ -39,8 +41,21 @@ func TestAsyncComm_SetLogLevel(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestAsyncComm_DeleteQIfExits(t *testing.T) {
+	ac.DeleteQ(Q)
+}
+
+func TestAsyncComm_RegisterConsumer(t *testing.T) {
+	c := asynccomm.Consumer{
+		Name: NewConsumer,
+		RefreshInterval: 200,
+	}
+	ac.RegisterConsumer(context.TODO(), c)
+}
+
 func TestAsyncComm_ConsumeMessageFailure(t *testing.T) {
 	_, _, err := ac.Pull(Q, Consumer, 100)
+	t.Log(fmt.Sprintf("ConsumeMessageFialureError : %+v", err))
 	assert.NotNil(t, err)
 }
 
@@ -65,6 +80,28 @@ func TestAsyncComm_Push(t *testing.T) {
 	}
 }
 
+func TestAsyncComm_ResourceRecovery_Consumer(t *testing.T) {
+	wg := new(sync.WaitGroup)
+	for i := 0; i < 2; i++ {
+		t.Run("RegisterConsumer-"+Consumer + strconv.Itoa(i), func(t *testing.T) {
+			c := asynccomm.Consumer{
+				Name: Consumer + strconv.Itoa(i),
+				RefreshInterval: 200,
+				Wg: wg,
+			}
+			wg.Add(1)
+			ac.RegisterConsumer(context.TODO(), c)
+		})
+	}
+	t.Log("waitGroup count: ", wg)
+	for i := 0; i < 2; i++ {
+		t.Run("DeRegisterConsumer-"+Consumer + strconv.Itoa(i), func(t *testing.T) {
+			ac.DeRegisterConsumer(Consumer + strconv.Itoa(i))
+		})
+	}
+	wg.Wait()
+}
+
 func TestAsyncComm_Pull(t *testing.T) {
 	for i:=0; i < 5; i++ {
 		t.Run(fmt.Sprintf("Consuming_Message_%d", i), func(t *testing.T) {
@@ -78,8 +115,12 @@ func TestAsyncComm_Pull(t *testing.T) {
 }
 
 func TestAsyncComm_ClaimPendingMessages(t *testing.T) {
-	err := ac.ClaimPendingMessages(Q, NewConsumer)
-	assert.Nil(t, err)
+	for _, id := range ids {
+		t.Run("ClaimingMessage-" + id, func(t *testing.T) {
+			err := ac.ClaimPendingMessages(Q, NewConsumer)
+			assert.Nil(t, err)
+		})
+	}
 }
 
 func TestAsyncComm_Ack(t *testing.T) {
@@ -88,7 +129,7 @@ func TestAsyncComm_Ack(t *testing.T) {
 }
 
 func TestAsyncComm_Pending(t *testing.T)  {
-	msgs, _, err := ac.PendingMessages(Q)
+	msgs, _, err := ac.PendingMessages(Q, 100)
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(msgs), msgs)
 }

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"net"
-	"strconv"
 	"time"
 )
 
@@ -160,11 +159,6 @@ func (r *Redis) Ack(q string, msgId... string) error {
 		r.Log.Errorf("failed acknowledge { ids: %v, err: %s }", msgId, err.Error())
 		return err
 	}
-	cmd := r.RdbCon.IncrBy(r.Ctx, fmt.Sprintf("%s::%s::acknowledge", q, grp), int64(len(msgId)))
-	_, err = cmd.Result()
-	if err != nil {
-		r.Log.Debugf("failed to increment acknowledge counter { q: %s, grp: %s, error: %s }", q, grp, err.Error())
-	}
 	r.Log.Debugf("message acknowledge successfully for message %v - res : %d", msgId, res)
 	return nil
 }
@@ -268,16 +262,16 @@ func (r *Redis) DeleteQ(q string) error {
 	return nil
 }
 
-func (r *Redis) PendingStreamMessages(q string) (map[string][]string, int, error) {
+func (r *Redis) PendingStreamMessages(q string, idleTime time.Duration) (map[string][]string, int, error) {
 	grp := q + DefaultConsumerGrpSuf
-	args := &redis.XPendingExtArgs{
+	args := redis.XPendingExtArgs{
 		Stream:   q,
 		Group:    grp,
-		Start: 	  "-",
+		Start:    "-",
 		End:      "+",
-		Count: 	  100,
+		Count:    100,
 	}
-	cmd := r.RdbCon.XPendingExt(r.Ctx, args)
+	cmd := r.RdbCon.XPendingExt(context.TODO(), &args)
 	pending, err := cmd.Result()
 	if err != nil {
 		return nil, 0, err
@@ -293,20 +287,24 @@ func (r *Redis) PendingStreamMessages(q string) (map[string][]string, int, error
 	return res, msgCount, nil
 }
 
-func (r *Redis) ClaimPendingMessages(q, consumer string) error  {
-	msgs, _, err := r.PendingStreamMessages(q)
+func (r *Redis) ClaimPendingMessages(q, consumer string, msgIdleTime time.Duration) error  {
+	msgs, _, err := r.PendingStreamMessages(q, msgIdleTime)
 	if err != nil {
 		r.Log.Errorf("failed to fetch pending messages { q: %s, consumer: %s, error: %s}", q, consumer, err.Error())
 		return err
 	}
 	var errors []error
 	for k, ids := range msgs {
-		if _, err := r.Get("active_consumers_" + k); err != nil {
-			err := r.claimMessages(q, consumer, ids...)
-			if err != nil {
-				errors = append(errors, fmt.Errorf("claimed failed! { inActiveConsumer: %s, err : %s }", k, err.Error()))
+		if _, err := r.Get("active_consumers_" + k); err != nil && err.Error() == "redis: nil" {
+			if len(ids) > 0 {
+				err := r.claimMessages(q, consumer, ids[0])
+				if err != nil {
+					errors = append(errors, fmt.Errorf("claimed failed! { inActiveConsumer: %s, err : %s }", k, err.Error()))
+				}
+				r.Log.Debugf("messages claimed! { inActiveConsumer: %s, newConsumer: %s, msgId: %s }", k, consumer, ids[0])
+				// returning after one successful claim by the current consumer
+				return nil
 			}
-			r.Log.Debugf("messages claimed! { inActiveConsumer: %s, newConsumer: %s }", k, consumer)
 		}
 	}
 	if len(errors) > 0 {
@@ -329,18 +327,6 @@ func (r *Redis) GetQStats(opts QStatusOptions) (QStatus, error) {
 		status.Consumers = r.getConsumerInfo(opts.Q)
 	}
 	return status, nil
-}
-
-func (r *Redis) getAckMessagesInQ(q string) int64 {
-	grp := q + DefaultConsumerGrpSuf
-	key := fmt.Sprintf("%s::%s::acknowledge", q, grp)
-	cnt, err := r.Get(key)
-	if err != nil {
-		r.Log.Debugf("failed to fetch total count from increment key '%s': %s",key, err.Error())
-		return 0
-	}
-	acked, _ := strconv.Atoi(cnt)
-	return int64(acked)
 }
 
 func (r *Redis) getConsumerInfo(q string) []Consumer {
@@ -379,10 +365,8 @@ func (r *Redis) getStreamInfo(q string) (Info, error) {
 		r.Log.Debugf("failed to fetch stream info '%s': %s", q, err.Error())
 		return Info{}, err
 	}
-	ackMsgCount := r.getAckMessagesInQ(q)
 	return Info{
 		Length:          info.Length,
-		Acknowledged:    ackMsgCount,
 		RadixTreeKeys:   info.RadixTreeKeys,
 		RadixTreeNodes:  info.RadixTreeNodes,
 		LastGeneratedID: info.LastGeneratedID,
@@ -398,7 +382,6 @@ func (r *Redis) claimMessages(q,  consumer string, msgId... string) error {
 		Stream:    q,
 		Group:     grp,
 		Consumer:  consumer,
-		MinIdle:   20000,
 		Messages:  msgId,
 	}
 	cmd := r.RdbCon.XClaim(r.Ctx, args)
@@ -408,15 +391,6 @@ func (r *Redis) claimMessages(q,  consumer string, msgId... string) error {
 	}
 	r.Log.Debugf("message claimed - %#v", msg)
 	return nil
-}
-
-// syncConsumers fetches all the pending messages in
-// the stream and check if there consumer is alive
-// by verifying it with the sync queue. if the consumer
-// is not present in the queue a request will be raised
-// by this consumer to claim that message using XClaim
-func (r *Redis) syncConsumers() {
-
 }
 
 // onConnect informs if the connection is successfully established

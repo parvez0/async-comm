@@ -33,7 +33,9 @@ func (ac *AsyncComm) Pull(q, consumer string, block time.Duration) ([]byte, stri
 
 func (ac *AsyncComm) Push(q string, msg []byte) (string, error)
 
-func (ac *AsyncComm) RegisterConsumer(ctx context.Context, cnsmr string, rTime, claimTime int, wg *sync.WaitGroup)
+func (ac *AsyncComm) RegisterConsumer(ctx context.Context, consumer asynccomm.Consumer) error
+
+func (ac *AsyncComm) DeRegisterConsumer(name string) error
 
 func (ac *AsyncComm) SetLogLevel(level string) error
 
@@ -124,7 +126,10 @@ application:
       q: req-a-q
       name: consumerX
       processing_time: 1000
-      refresh_time: 5000
+      refresh_time: 5000             # time interval for refreshing consumer status
+      claim_time: 5000               # time interval for claiming the failed consumers messages
+      block_time: 300                # time to wait for a new message if q is empty
+      msg_idle_time: 5000            # time after which a pending message should be consumed
 ```
 If you want to provide a field in environment variable Keys should be conjunction with '.' separator. for example you can 
 provide the redis host and port by exporting environment variables like this
@@ -207,7 +212,6 @@ Response QStatus:
 redis.QStatus{
 	Info:redis.Info{
 		Length:5,                // total messages in the q
-		Acknowledged:5,          // acknowledge messages
 		RadixTreeKeys:1, 
 		RadixTreeNodes:2, 
 		LastGeneratedID:"1620421718593-0", 

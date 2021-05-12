@@ -16,7 +16,7 @@ func (a *App) InitiateConsumers(ctx context.Context, r Routine, wg *sync.WaitGro
 			return
 		default:
 			msg, id,  err := a.aclib.Pull(r.Q, r.Name, 100 * time.Millisecond)
-			if err != nil {
+			if err != nil || id == "" {
 				// ignoring consumer readTimeout error
 				// ReadTimeoutError get triggers when no messages were received during the specified time
 				if err.Error() == "redis: nil" {
@@ -31,7 +31,7 @@ func (a *App) InitiateConsumers(ctx context.Context, r Routine, wg *sync.WaitGro
 				a.log.Infof("Pulled %s at %s by %s", sMsg, FormatTime(tm), r.Name)
 				a.log.Infof("Time %s remained in the Queuing System: %dms", sMsg, timeTaken.Milliseconds())
 				time.Sleep(time.Duration(r.ProcessingTime) * time.Millisecond)
-				if id != "" || r.Name != os.Getenv("TEST_CONSUMER") {
+				if r.Name != os.Getenv("TEST_CONSUMER") {
 					err = a.aclib.Ack(r.Q, id)
 					if err != nil {
 						a.log.Errorf("failed to ack message %s by consumer %s : %s", id, r.Name, err.Error())

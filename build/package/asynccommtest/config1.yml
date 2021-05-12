@@ -19,26 +19,26 @@ ac_logger:
 # application information
 application:
   app: App-A
-  claim_time: 1000
   routines:
     - role: producer
-      q: req-a-q #group req-q-consumer-group
+      q: req-b-q #group req-q-consumer-group
       name: producerX
       message:
         format: "{{.App}}-{{.Producer}}-{{.Time}}"
         freq: 500
     - role: consumer
-      q: req-a-q
+      q: req-b-q
       name: consumerX
       processing_time: 2000
       refresh_time: 5000
-    - role: consumer
-      q: req-a-q
-      name: consumerY
-      processing_time: 2000
-      refresh_time: 5000
-    - role: consumer
-      q: req-a-q
-      name: consumerZ
-      processing_time: 2000
-      refresh_time: 5000
+      msg_idle_time: 100
+#    - role: consumer
+#      q: req-a-q
+#      name: consumerY
+#      processing_time: 2000
+#      refresh_time: 5000
+#    - role: consumer
+#      q: req-a-q
+#      name: consumerZ
+#      processing_time: 2000
+#      refresh_time: 5000

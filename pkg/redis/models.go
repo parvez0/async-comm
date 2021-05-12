@@ -20,7 +20,6 @@ type Consumer struct {
 
 type Info struct {
 	Length          int64     `json:"length"`
-	Acknowledged	int64     `json:"acknowledged"`
 	RadixTreeKeys   int64     `json:"radix_tree_keys"`
 	RadixTreeNodes  int64     `json:"radix_tree_nodes"`
 	LastGeneratedID string    `json:"last_generated_id"`
