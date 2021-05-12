@@ -21,13 +21,13 @@ application:
   app: App-A
   routines:
     - role: producer
-      q: req-b-q #group req-q-consumer-group
+      q: req-f-q #group req-q-consumer-group
       name: producerX
       message:
         format: "{{.App}}-{{.Producer}}-{{.Time}}"
         freq: 500
     - role: consumer
-      q: req-b-q
+      q: req-f-q
       name: consumerX
       processing_time: 2000
       refresh_time: 5000

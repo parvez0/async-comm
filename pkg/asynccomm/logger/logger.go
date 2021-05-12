@@ -5,6 +5,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Logger provides an interface to convert
@@ -30,6 +31,20 @@ func InitializeLogger(level, outFilePath string) (Logger, error) {
 		return log, nil
 	}
 
+	absPath := ""
+	if outFilePath != "" {
+		var err error
+		absPath, err = filepath.Abs(outFilePath)
+		if err != nil {
+			panic(fmt.Errorf("failed to load logfile : %s", err.Error()))
+		}
+		path := strings.Split(absPath, "/")
+		_, err = os.Stat(strings.Join(path[:len(path)-1], "/"))
+		if err != nil {
+			panic(fmt.Errorf("failed to load logfile : %s", err.Error()))
+		}
+	}
+
 	baseLogger := logrus.New()
 
 	// set REQUESTS_LOGLEVEL for custom_logger level, defaults to info
@@ -50,10 +65,9 @@ func InitializeLogger(level, outFilePath string) (Logger, error) {
 
 	// directing log output to a file if OutfilePath is defined, by default it will log to stdout
 	if outFilePath != "" {
-		file := filepath.Clean(outFilePath)
-		fd, err := os.OpenFile(file, os.O_WRONLY | os.O_CREATE, 0755)
+		fd, err := os.OpenFile(absPath, os.O_APPEND | os.O_CREATE, 0755)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open file %s for logging - %s", file, err.Error())
+			return nil, fmt.Errorf("failed to open file %s for logging - %s", absPath, err.Error())
 		}
 		baseLogger.SetOutput(fd)
 	}

@@ -29,7 +29,7 @@ func FormatTime(t time.Time) string {
 }
 
 func GetCurTime() string {
-	loc, err := time.LoadLocation("Asia/Kolkata")
+	loc, err := time.LoadLocation("")
 	if err != nil {
 		log.Errorf("failed to load location 'Asia/Kolkata': %s", err.Error())
 	}
@@ -46,7 +46,7 @@ func GetTimeFromString(msg string) (t time.Time) {
 	}()
 	r := regexp.MustCompile("\\d{2}:\\d{2}:\\d{2}:\\d{2}:\\d{2}\\.\\d{3}")
 	msgTime := r.FindString(msg)
-	loc, err := time.LoadLocation("Asia/Kolkata")
+	loc, err := time.LoadLocation("")
 	if err != nil {
 		log.Errorf("failed to load location 'Asia/Kolkata': %s", err.Error())
 	}

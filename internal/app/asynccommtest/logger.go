@@ -5,6 +5,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Logger provides an interface to convert
@@ -29,6 +30,19 @@ func InitializeLogger(config *Config) Logger {
 	if log != nil {
 		return log
 	}
+	absPath := ""
+	if config.Logger.OutputFilePath != "" {
+		var err error
+		absPath, err = filepath.Abs(config.Logger.OutputFilePath)
+		if err != nil {
+			panic(fmt.Errorf("failed to load logfile : %s", err.Error()))
+		}
+		path := strings.Split(absPath, "/")
+		_, err = os.Stat(strings.Join(path[:len(path)-1], "/"))
+		if err != nil {
+			panic(fmt.Errorf("failed to load logfile : %s", err.Error()))
+		}
+	}
 
 	baseLogger := logrus.New()
 
@@ -44,19 +58,20 @@ func InitializeLogger(config *Config) Logger {
 		FullTimestamp: config.Logger.FullTimestamp,
 	})
 
+	// directing log output to a file if OutfilePath is defined, by default it will log to stdout
+	if config.Logger.OutputFilePath != "" {
+		fd, err := os.OpenFile(absPath, os.O_CREATE | os.O_APPEND, 0755)
+		if err != nil {
+			log.Errorf("failed to open file %s for logging - %s", absPath, err.Error())
+			os.Exit(1)
+		}
+		baseLogger.SetOutput(fd)
+	}
+
 	// set to true for showing filename and line number from where custom_logger being called
 	baseLogger.SetReportCaller(false)
 	baseLogger.SetLevel(level)
 
-	// directing log output to a file if OutfilePath is defined, by default it will log to stdout
-	if config.Logger.OutputFilePath != "" {
-		file := filepath.Clean(config.Logger.OutputFilePath)
-		fd, err := os.OpenFile(file, os.O_WRONLY | os.O_CREATE, 0755)
-		if err != nil {
-			log.Panicf("failed to open file %s for logging - %s", file, err.Error())
-		}
-		baseLogger.SetOutput(fd)
-	}
 	log = baseLogger
 	return log
 }

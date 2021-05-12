@@ -13,7 +13,7 @@ app_logger:
 
 # ac library logger configuration
 ac_logger:
-  level: debug
+  level: info
   output_file_path: ""
 
 # application information
@@ -21,22 +21,22 @@ application:
   app: App-A
   routines:
     - role: producer
-      q: req-a-q #group req-q-consumer-group
+      q: req-e-q #group req-q-consumer-group
       name: producerA
       message:
         format: "{{.App}}-{{.Producer}}-{{.Time}}"
-        freq: 100
+        freq: 1000
     - role: consumer
-      q: req-a-q
+      q: req-e-q
       name: consumerX
-      processing_time: 1000
+      processing_time: 100
       refresh_time: 5000
       claim_time: 500
       block_time: 200
-    - role: consumer
-      q: req-a-q
-      name: consumerY
-      processing_time: 1000
-      refresh_time: 500
-      block_time: 200
-      msg_idle_time: 500
+#    - role: consumer
+#      q: req-a-q
+#      name: consumerY
+#      processing_time: 1000
+#      refresh_time: 500
+#      block_time: 200
+#      msg_idle_time: 500
