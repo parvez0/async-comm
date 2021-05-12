@@ -54,7 +54,7 @@ func main()  {
 			// creating producer routine to send messages at every given interval
 			go pApp.InitiateProducer(ctx, r, cnf.App.App, wg)
 		case "consumer":
-			wg.Add(2)
+			wg.Add(1)
 			// Reviewed changes: registering consumer with keep alive at every r.RefreshTime interval
 			cns := asynccomm.Consumer{
 				Name:            r.Name,
