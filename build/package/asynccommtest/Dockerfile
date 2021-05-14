@@ -11,7 +11,7 @@ COPY ./ ./
 
 # Build binary
 # -o denotes where to put executable
-RUN env GOOS=linux GOARCH=arm64 go build -o /go/bin/asynccomm ./internal/app/asynccommtest
+RUN env GOOS=linux GOARCH=amd64 go build -o /go/bin/asynccomm ./internal/app/asynccommtest
 
 # Production image
 FROM ubuntu:20.04
