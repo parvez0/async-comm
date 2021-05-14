@@ -58,6 +58,7 @@ type Routine struct {
 		FormattedMsg string `json:"formatted_msg" mapstructure:"formatted_msg"`
 		Format string `json:"format" mapstructure:"format"`
 		Freq   int `json:"freq" mapstructure:"freq"`
+		TotalMsgs   int `json:"total_msgs,omitempty" mapstructure:"total_msgs"`
 	} `json:"message,omitempty" mapstructure:"message"`
 	ProcessingTime int `json:"processing_time,omitempty" mapstructure:"processing_time"`
 	RefreshTime    int `json:"refresh_time,omitempty" mapstructure:"refresh_time"`
@@ -110,6 +111,7 @@ func InitializeConfig() *Config {
 	viper.SetDefault("app_logger.full_timestamp", true)
 
 	err := viper.Unmarshal(&config)
+	fmt.Printf("Config: %s", *config)
 	if err != nil {
 		panic(fmt.Sprintf("unable to decode config file : %v", err))
 	}

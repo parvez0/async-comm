@@ -31,12 +31,14 @@ func InitializeLogger(config *Config) Logger {
 		return log
 	}
 	absPath := ""
+	fmt.Println("Output File Path: ", config.Logger.OutputFilePath)
 	if config.Logger.OutputFilePath != "" {
 		var err error
 		absPath, err = filepath.Abs(config.Logger.OutputFilePath)
 		if err != nil {
 			panic(fmt.Errorf("failed to load logfile : %s", err.Error()))
 		}
+	        fmt.Println("Abs Path: ", absPath)
 		path := strings.Split(absPath, "/")
 		_, err = os.Stat(strings.Join(path[:len(path)-1], "/"))
 		if err != nil {
@@ -60,9 +62,9 @@ func InitializeLogger(config *Config) Logger {
 
 	// directing log output to a file if OutfilePath is defined, by default it will log to stdout
 	if config.Logger.OutputFilePath != "" {
-		fd, err := os.OpenFile(absPath, os.O_CREATE | os.O_APPEND, 0755)
+		fd, err := os.OpenFile(absPath, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0666)
 		if err != nil {
-			log.Errorf("failed to open file %s for logging - %s", absPath, err.Error())
+			fmt.Printf("failed to open file %s for logging - %s", absPath, err.Error())
 			os.Exit(1)
 		}
 		baseLogger.SetOutput(fd)

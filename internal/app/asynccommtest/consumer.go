@@ -22,7 +22,7 @@ func (a *App) InitiateConsumers(ctx context.Context, r Routine, wg *sync.WaitGro
 				if err.Error() == "redis: nil" {
 					continue
 				}
-				a.log.Infof("Failed Pulling: { stream: %s, consumer: %s, error: %s }", r.Q, r.Name, err.Error())
+				a.log.Debugf("Failed Pulling: { stream: %s, consumer: %s, error: %s }", r.Q, r.Name, err.Error())
 			} else {
 				sMsg := string(msg)
 				msgTime := GetTimeFromString(sMsg)

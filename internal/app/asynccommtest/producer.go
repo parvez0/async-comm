@@ -14,12 +14,25 @@ func (a *App) InitiateProducer(ctx context.Context, ru Routine, app string, wg *
 	if err != nil {
 		a.log.Panicf("failed to create q '%s' for producer '%s' - %s", ru.Q, ru.Name, err.Error())
 	}
+
+	a.log.Infof("Total number of messages configured for Producer: %s are: %d", ru.Name, ru.Message.TotalMsgs)
+	a.log.Infof("Frequency of messages configured for Producer: %s are: %d", ru.Name, ru.Message.Freq)
+	if ru.Message.TotalMsgs != 0 {
+		a.log.Infof("Producer: %s will post %d number of messgaes in %s queue", ru.Name, ru.Message.TotalMsgs, ru.Q)
+	}
+
+	totalMsgs := 0
 	for {
 		select {
 		case <-ctx.Done():
 			a.log.Warnf("sigterm received, safely stopping producer '%s'", ru.Name)
 			return
 		default:
+			if ru.Message.TotalMsgs != 0 && totalMsgs >= ru.Message.TotalMsgs {
+				a.log.Infof("Producer: %s exiting because total number of messages: %d requested are posted in the Q",
+				ru.Name, ru.Message.TotalMsgs)
+				return
+			}
 			msg, err := ParseTemplate(&ru, app)
 			if err != nil {
 				a.log.Errorf(err.Error())
@@ -33,6 +46,7 @@ func (a *App) InitiateProducer(ctx context.Context, ru Routine, app string, wg *
 			} else {
 				a.log.Infof("Posted %s Successfully", msg)
 				a.log.Debugf("messaged pushed generated  { q: %s, id: %s }", ru.Q, res)
+				totalMsgs += 1
 			}
 			time.Sleep(time.Duration(ru.Message.Freq) * time.Millisecond)
 		}
