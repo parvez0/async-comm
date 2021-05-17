@@ -21,9 +21,11 @@ type Logger interface {
 	Debugf(format string, args ...interface{})
 	Errorf(format string, args ...interface{})
 	Panicf(format string, args ...interface{})
+	Exit(code int)
 }
 
 var log *logrus.Logger
+var fd *os.File
 
 // NewLogger returns a logrus custom_logger object with prefilled options
 func InitializeLogger(level, outFilePath string) (Logger, error) {
@@ -65,7 +67,7 @@ func InitializeLogger(level, outFilePath string) (Logger, error) {
 
 	// directing log output to a file if OutfilePath is defined, by default it will log to stdout
 	if outFilePath != "" {
-		fd, err := os.OpenFile(absPath, os.O_APPEND | os.O_CREATE, 0755)
+		fd, err = os.OpenFile(absPath, os.O_APPEND | os.O_WRONLY | os.O_CREATE, 0755)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open file %s for logging - %s", absPath, err.Error())
 		}
@@ -82,4 +84,11 @@ func SetLevel(level string)  (Logger, error) {
 	}
 	log.SetLevel(lvl)
 	return log, nil
+}
+
+func CloseLogger() {
+	if fd != nil {
+		fd.Sync()
+		fd.Close()
+	}
 }

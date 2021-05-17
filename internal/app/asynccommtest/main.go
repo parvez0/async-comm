@@ -62,7 +62,6 @@ func main()  {
 				BlockTime:       time.Duration(r.BlockTime),
 				RefreshInterval: time.Duration(r.RefreshTime),
 				MsgIdleDuration: time.Duration(r.MsgIdleTime),
-				Wg:              wg,
 			}
 			cApp.aclib.RegisterConsumer(ctx, cns)
 			go cApp.InitiateConsumers(ctx, r, wg)
@@ -75,6 +74,7 @@ func main()  {
 	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGQUIT)
 	<-termChan
 	quit()
+	CloseLogger()
 	wg.Wait()
 }
 

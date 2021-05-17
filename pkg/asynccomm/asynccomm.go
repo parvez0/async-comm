@@ -29,7 +29,7 @@ type Consumer struct {
 	BlockTime       	time.Duration
 	RefreshInterval 	time.Duration
 	MsgIdleDuration     time.Duration
-	Wg					*sync.WaitGroup
+	wg					*sync.WaitGroup
 	ctx 				context.Context
 	cancel 				context.CancelFunc
 	lastSync       		*time.Time
@@ -60,7 +60,7 @@ func (ac *AsyncComm) Push(q string, msg []byte) (string, error) {
 	return ac.Rdb.Produce(q, string(msg))
 }
 
-func (ac *AsyncComm) Pull(q, consumer string, block time.Duration) ([]byte, string, error) {
+func (ac *AsyncComm) Pull(q, consumer string) ([]byte, string, error) {
 	tm, err := ac.getStartTime(consumer)
 	if err != nil {
 		tm = ac.setStartTime(consumer)
@@ -73,7 +73,11 @@ func (ac *AsyncComm) Pull(q, consumer string, block time.Duration) ([]byte, stri
 		ac.Log.Debugf("pending message claim request initiated by consumer '%s'", consumer)
 		ac.setStartTime(consumer)
 	}
-	return ac.Rdb.Consume(q, consumer, block)
+	c, _ := ac.getConsumer(consumer)
+	if c == nil {
+		return nil, "", fmt.Errorf("no such consumer '%s' registered", consumer)
+	}
+	return ac.Rdb.Consume(q, consumer, c.BlockTime)
 }
 
 func (ac *AsyncComm) Ack(q string, msgId... string) error {
@@ -129,11 +133,10 @@ func (ac *AsyncComm) RegisterConsumer(ctx context.Context, c Consumer) error {
 	if c.MsgIdleDuration == 0 {
 		c.MsgIdleDuration = ConsumerMsgIdleDuration
 	}
-	if c.Wg == nil {
-		c.Wg = new(sync.WaitGroup)
-	}
+
 	syncTime := time.Now().Add(c.RefreshInterval * time.Millisecond)
 	c.lastSync = &syncTime
+	c.wg = new(sync.WaitGroup)
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	go ac.syncConsumer(&c)
 	lock.Lock()
@@ -198,7 +201,7 @@ func (ac *AsyncComm) removeConsumer(i int)  {
 }
 
 func (ac *AsyncComm) syncConsumer(c *Consumer)  {
-	defer c.Wg.Done()
+	defer c.wg.Done()
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -220,5 +223,6 @@ func (ac *AsyncComm) syncConsumer(c *Consumer)  {
 }
 
 func (ac *AsyncComm) Close()  {
+	logger.CloseLogger()
 	ac.Rdb.Close()
 }

@@ -67,7 +67,7 @@ func TestInitializeConsumer(t *testing.T)  {
 	wg.Add(1)
 	ctx, cancel := context.WithCancel(context.Background())
 	go a.InitiateConsumers(ctx, ConsumerRoutine, wg)
-	time.Sleep(1 * time.Second)
+	time.Sleep(200 * time.Millisecond)
 	cancel()
 	wg.Wait()
 }

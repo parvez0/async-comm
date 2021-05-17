@@ -270,8 +270,9 @@ func (r *Redis) PendingStreamMessages(q string, idleTime time.Duration) (map[str
 		Start:    "-",
 		End:      "+",
 		Count:    100,
+		Idle:     idleTime,
 	}
-	cmd := r.RdbCon.XPendingExt(context.TODO(), &args)
+	cmd := r.RdbCon.XPendingExt(r.Ctx, &args)
 	pending, err := cmd.Result()
 	if err != nil {
 		return nil, 0, err

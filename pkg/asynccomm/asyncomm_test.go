@@ -54,7 +54,8 @@ func TestAsyncComm_RegisterConsumer(t *testing.T) {
 }
 
 func TestAsyncComm_ConsumeMessageFailure(t *testing.T) {
-	_, _, err := ac.Pull(Q, Consumer, 100)
+	registerConsumers()
+	_, _, err := ac.Pull(Q, Consumer)
 	t.Log(fmt.Sprintf("ConsumeMessageFialureError : %+v", err))
 	assert.NotNil(t, err)
 }
@@ -87,9 +88,7 @@ func TestAsyncComm_ResourceRecovery_Consumer(t *testing.T) {
 			c := asynccomm.Consumer{
 				Name: Consumer + strconv.Itoa(i),
 				RefreshInterval: 200,
-				Wg: wg,
 			}
-			wg.Add(1)
 			ac.RegisterConsumer(context.TODO(), c)
 		})
 	}
@@ -103,10 +102,11 @@ func TestAsyncComm_ResourceRecovery_Consumer(t *testing.T) {
 }
 
 func TestAsyncComm_Pull(t *testing.T) {
+	registerConsumers()
 	for i:=0; i < 5; i++ {
 		t.Run(fmt.Sprintf("Consuming_Message_%d", i), func(t *testing.T) {
 			c := fmt.Sprintf("%s_%d", Consumer, i%2)
-			msg, id, err := ac.Pull(Q, c, 100)
+			msg, id, err := ac.Pull(Q, c)
 			assert.Nil(t, err)
 			t.Logf("message consumed Id: %s, data : %s", id, string(msg))
 			ids = append(ids, id)
@@ -142,4 +142,14 @@ func TestAsyncComm_DeleteQ(t *testing.T) {
 func TestAsyncComm_GroupExists(t *testing.T) {
 	exists := ac.GroupExists(Q)
 	assert.Equal(t, false, exists)
+}
+
+func registerConsumers() {
+	for _, v := range []string{ Consumer, NewConsumer, Consumer+"_0", Consumer+"_1" } {
+		c := asynccomm.Consumer{
+			Name:            v,
+			BlockTime:       1 * time.Millisecond,
+		}
+		ac.RegisterConsumer(context.TODO(), c)
+	}
 }

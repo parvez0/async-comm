@@ -24,6 +24,7 @@ type Logger interface {
 }
 
 var log *logrus.Logger
+var fd *os.File
 
 // NewLogger returns a logrus custom_logger object with prefilled options
 func InitializeLogger(config *Config) Logger {
@@ -60,7 +61,7 @@ func InitializeLogger(config *Config) Logger {
 
 	// directing log output to a file if OutfilePath is defined, by default it will log to stdout
 	if config.Logger.OutputFilePath != "" {
-		fd, err := os.OpenFile(absPath, os.O_CREATE | os.O_APPEND, 0755)
+		fd, err = os.OpenFile(absPath, os.O_CREATE | os.O_WRONLY | os.O_APPEND, 0755)
 		if err != nil {
 			log.Errorf("failed to open file %s for logging - %s", absPath, err.Error())
 			os.Exit(1)
@@ -74,4 +75,12 @@ func InitializeLogger(config *Config) Logger {
 
 	log = baseLogger
 	return log
+}
+
+func CloseLogger() {
+	if fd != nil {
+		log.Debugf("flusing pending logs to file and close the descriptor")
+		fd.Sync()
+		fd.Close()
+	}
 }

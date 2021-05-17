@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -15,12 +16,16 @@ func (a *App) InitiateConsumers(ctx context.Context, r Routine, wg *sync.WaitGro
 			a.log.Warnf("sigterm received, safely stopping consumer '%s'", r.Name)
 			return
 		default:
-			msg, id,  err := a.aclib.Pull(r.Q, r.Name, 100 * time.Millisecond)
+			msg, id,  err := a.aclib.Pull(r.Q, r.Name)
 			if err != nil || id == "" {
 				// ignoring consumer readTimeout error
 				// ReadTimeoutError get triggers when no messages were received during the specified time
 				if err.Error() == "redis: nil" {
 					continue
+				}
+				if strings.HasPrefix(err.Error(),"no such consumer") {
+					a.log.Error("fatal error encountered:", err)
+					return
 				}
 				a.log.Infof("Failed Pulling: { stream: %s, consumer: %s, error: %s }", r.Q, r.Name, err.Error())
 			} else {

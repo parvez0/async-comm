@@ -30,7 +30,7 @@ application:
       q: req-f-q
       name: consumerX
       processing_time: 2000
-      refresh_time: 5000
+      refresh_time: 2000
       msg_idle_time: 100
 #    - role: consumer
 #      q: req-a-q
