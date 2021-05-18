@@ -29,9 +29,11 @@ application:
     - role: consumer
       q: req-f-q
       name: consumerX
-      processing_time: 2000
-      refresh_time: 2000
-      msg_idle_time: 100
+      processing_time: 500
+      refresh_time: 5000
+      claim_time: 5000
+      msg_idle_time: 5000
+      block_time: 200
 #    - role: consumer
 #      q: req-a-q
 #      name: consumerY

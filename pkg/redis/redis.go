@@ -128,17 +128,29 @@ func (r *Redis) Consume(q, name string, block time.Duration) ([]byte, string, er
 	args := redis.XReadGroupArgs{
 		Group:     grp,
 		Consumer:  name,
-		Streams:   []string{q, ">"},
+		Streams:   []string{q, "0"},
 		Count:     1,
 		NoAck:     false,
 		Block:     block,
 	}
-	cmd := r.RdbCon.XReadGroup(r.Ctx, &args)
-	res, err := cmd.Result()
+	res, err := r.RdbCon.XReadGroup(r.Ctx, &args).Result()
 	if err != nil {
 		return nil, "", err
 	}
 	r.Log.Debugf("message consumed from stream '%s' by consumer '%s'.'%s'", q, name, grp)
+	byts, id, err := r.formatConsumeMsg(res)
+	if err == nil && byts != nil {
+		return byts, id, err
+	}
+	args.Streams = []string{ q, ">" }
+	res, err = r.RdbCon.XReadGroup(r.Ctx, &args).Result()
+	if err != nil {
+		return nil, "", err
+	}
+	return r.formatConsumeMsg(res)
+}
+
+func (r *Redis) formatConsumeMsg(res []redis.XStream) ([]byte, string, error) {
 	for _, xmsg := range res {
 		for _, m := range xmsg.Messages {
 			return []byte(fmt.Sprintf("%v", m.Values["message"])), m.ID, nil
@@ -146,6 +158,7 @@ func (r *Redis) Consume(q, name string, block time.Duration) ([]byte, string, er
 	}
 	return nil, "", fmt.Errorf("redis returned empty messages - %+v", res)
 }
+
 
 // Ack used to acknowledge a message upon successful
 // consumption if the message is not ack it will go
@@ -269,7 +282,7 @@ func (r *Redis) PendingStreamMessages(q string, idleTime time.Duration) (map[str
 		Group:    grp,
 		Start:    "-",
 		End:      "+",
-		Count:    100,
+		Count:    10,
 		Idle:     idleTime,
 	}
 	cmd := r.RdbCon.XPendingExt(r.Ctx, &args)
@@ -296,9 +309,9 @@ func (r *Redis) ClaimPendingMessages(q, consumer string, msgIdleTime time.Durati
 	}
 	var errors []error
 	for k, ids := range msgs {
-		if _, err := r.Get("active_consumers_" + k); err != nil && err.Error() == "redis: nil" {
+		if _, err := r.Get("active_consumers_" + k); err != nil && err.Error() == "redis: nil" && consumer != k {
 			if len(ids) > 0 {
-				err := r.claimMessages(q, consumer, ids[0])
+				err = r.claimMessages(q, consumer, ids[0])
 				if err != nil {
 					errors = append(errors, fmt.Errorf("claimed failed! { inActiveConsumer: %s, err : %s }", k, err.Error()))
 				}
@@ -328,6 +341,20 @@ func (r *Redis) GetQStats(opts QStatusOptions) (QStatus, error) {
 		status.Consumers = r.getConsumerInfo(opts.Q)
 	}
 	return status, nil
+}
+
+func (r *Redis) addX(q string, msg interface{}) (string, error) {
+	args := &redis.XAddArgs{
+		Stream:       q,
+		Values:       msg,
+	}
+	xadd := r.RdbCon.XAdd(r.Ctx, args)
+	res, err := xadd.Result()
+	if err != nil {
+		return "", err
+	}
+	r.Log.Debugf("claim message refreshed for stream %s - res : %s", msg, res)
+	return res, nil
 }
 
 func (r *Redis) getConsumerInfo(q string) []Consumer {
