@@ -11,28 +11,27 @@ import (
 )
 
 const (
-	ConsumerBlockTime=300
+	ConsumerBlockTime = 300
 )
 
 type AsyncComm struct {
-	Rdb *redis.Redis
-	Log logger.Logger
+	Rdb       *redis.Redis
+	Log       logger.Logger
 	consumers []Consumer
 }
 
 type Consumer struct {
-	Name 		string
-	ClaimInterval       time.Duration
-	BlockTime       	time.Duration
-	RefreshInterval 	time.Duration
-	MsgIdleDuration     time.Duration
-	ctx 				context.Context
-	cancel 				context.CancelFunc
-	lastSync       		time.Time
+	Name            string
+	ClaimInterval   time.Duration
+	BlockTime       time.Duration
+	RefreshInterval time.Duration
+	MsgIdleDuration time.Duration
+	ctx             context.Context
+	cancel          context.CancelFunc
+	lastSync        time.Time
 }
 
 var lock = sync.RWMutex{}
-var mutex = sync.Mutex{}
 
 // NewAC creates a asyncComm library instance for managing
 // async message methods like push, pull etc
@@ -58,7 +57,7 @@ func (ac *AsyncComm) Push(q string, msg []byte) (string, error) {
 }
 
 func (ac *AsyncComm) Pull(q, consumer string) ([]byte, string, error) {
-	tm, err := ac.getStartTime(consumer)
+	tm, c, err := ac.getStartTime(consumer)
 	if err != nil {
 		tm = ac.setStartTime(consumer)
 	}
@@ -70,14 +69,13 @@ func (ac *AsyncComm) Pull(q, consumer string) ([]byte, string, error) {
 		ac.Log.Debugf("pending message claim request initiated by consumer '%s'", consumer)
 		ac.setStartTime(consumer)
 	}
-	c, _ := ac.getConsumer(consumer)
 	if c == nil {
 		return nil, "", fmt.Errorf("no such consumer '%s' registered", consumer)
 	}
 	return ac.Rdb.Consume(q, consumer, c.BlockTime)
 }
 
-func (ac *AsyncComm) Ack(q string, msgId... string) error {
+func (ac *AsyncComm) Ack(q string, msgId ...string) error {
 	return ac.Rdb.Ack(q, msgId...)
 }
 
@@ -147,12 +145,12 @@ func (ac *AsyncComm) GetQStats(opts redis.QStatusOptions) (redis.QStatus, error)
 	return ac.Rdb.GetQStats(opts)
 }
 
-func (ac *AsyncComm) getStartTime(consumer string) (time.Time, error) {
+func (ac *AsyncComm) getStartTime(consumer string) (time.Time, *Consumer, error) {
 	c, _ := ac.getConsumer(consumer)
 	if c != nil {
-		return c.lastSync, nil
+		return c.lastSync, c, nil
 	}
-	return time.Time{}, fmt.Errorf("initial claimTime not set for consumer: %s", consumer)
+	return time.Time{}, c, fmt.Errorf("initial claimTime not set for consumer: %s", consumer)
 }
 
 func (ac *AsyncComm) setStartTime(consumer string) time.Time {
@@ -167,7 +165,7 @@ func (ac *AsyncComm) setStartTime(consumer string) time.Time {
 	return syncTime
 }
 
-func (ac *AsyncComm) getConsumer(consumer string) (*Consumer, int)  {
+func (ac *AsyncComm) getConsumer(consumer string) (*Consumer, int) {
 	for i, c := range ac.consumers {
 		if c.Name == consumer {
 			return &c, i
@@ -176,13 +174,13 @@ func (ac *AsyncComm) getConsumer(consumer string) (*Consumer, int)  {
 	return nil, 0
 }
 
-func (ac *AsyncComm) updateConsumer(c *Consumer, index int)  {
+func (ac *AsyncComm) updateConsumer(c *Consumer, index int) {
 	lock.Lock()
 	defer lock.Unlock()
 	ac.consumers[index] = *c
 }
 
-func (ac *AsyncComm) removeConsumer(i int)  {
+func (ac *AsyncComm) removeConsumer(i int) {
 	lock.Lock()
 	defer lock.Unlock()
 	cns := ac.consumers
@@ -190,7 +188,7 @@ func (ac *AsyncComm) removeConsumer(i int)  {
 	ac.consumers = cns[:len(cns)-1]
 }
 
-func (ac *AsyncComm) syncConsumer(c *Consumer)  {
+func (ac *AsyncComm) syncConsumer(c *Consumer) {
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -200,11 +198,11 @@ func (ac *AsyncComm) syncConsumer(c *Consumer)  {
 			if c.Name == os.Getenv("TEST_CONSUMER") {
 				return
 			}
-			sts, err := ac.Rdb.Set("active_consumers_" + c.Name, time.Now().String(), c.RefreshInterval)
+			sts, err := ac.Rdb.Set("active_consumers_"+c.Name, time.Now().String(), c.RefreshInterval)
 			if err != nil {
 				ac.Log.Panicf("failed to register consumer %s - %s", c.Name, err.Error())
 			}
-			refreshTime := c.RefreshInterval - (c.RefreshInterval/10)
+			refreshTime := c.RefreshInterval - (c.RefreshInterval / 10)
 			ac.Log.Infof("consumer '%s' registered with refreshTime: '%dms', status: '%s'", c.Name, refreshTime/time.Millisecond, sts)
 			time.Sleep(c.RefreshInterval)
 		}
@@ -222,7 +220,7 @@ func (ac *AsyncComm) formatDurationMs(dur time.Duration) time.Duration {
 	return dur / time.Millisecond
 }
 
-func (ac *AsyncComm) Close()  {
+func (ac *AsyncComm) Close() {
 	logger.CloseLogger()
 	ac.Rdb.Close()
 }

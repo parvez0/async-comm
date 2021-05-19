@@ -13,7 +13,7 @@ import (
 
 const (
 	LogLevel = "info"
-	Q = "app_test_q"
+	Q        = "app_test_q"
 )
 
 var (
@@ -21,24 +21,25 @@ var (
 )
 
 var ProducerRoutine = main.Routine{
-	Role:  "producer",
-	Q:     Q,
-	Name:  "app_test_producer",
+	Role: "producer",
+	Q:    Q,
+	Name: "app_test_producer",
 	Message: struct {
-    	FormattedMsg string `json:"formatted_msg" mapstructure:"formatted_msg"`
-    	Format       string `json:"format" mapstructure:"format"`
-    	Freq         int    `json:"freq" mapstructure:"freq"`
+		FormattedMsg string `json:"formatted_msg" mapstructure:"formatted_msg"`
+		Format       string `json:"format" mapstructure:"format"`
+		Freq         int    `json:"freq" mapstructure:"freq"`
+		TotalMsgs    int    `json:"total_msgs,omitempty" mapstructure:"total_msgs"`
 	}{
 		Format: "{{.App}}-{{.Producer}}-{{.Time}}",
-		Freq: 500,
+		Freq:   500,
 	},
 }
 
 var ConsumerRoutine = main.Routine{
-	Role:  "consumer",
-	Q:      Q,
-	Name:  "app_test_consumer",
-	RefreshTime: 10000,
+	Role:           "consumer",
+	Q:              Q,
+	Name:           "app_test_consumer",
+	RefreshTime:    10000,
 	ProcessingTime: 100,
 }
 
@@ -52,7 +53,7 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestInitializeProducer(t *testing.T)  {
+func TestInitializeProducer(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -62,7 +63,7 @@ func TestInitializeProducer(t *testing.T)  {
 	wg.Wait()
 }
 
-func TestInitializeConsumer(t *testing.T)  {
+func TestInitializeConsumer(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -72,7 +73,7 @@ func TestInitializeConsumer(t *testing.T)  {
 	wg.Wait()
 }
 
-func TestDeleteQ(t *testing.T)  {
+func TestDeleteQ(t *testing.T) {
 	rdbOpts := acRedis.Options{}
 	rdb := acRedis.NewRdb(context.TODO(), rdbOpts)
 	aclib, _ := asynccomm.NewAC(rdb)

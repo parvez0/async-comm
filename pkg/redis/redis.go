@@ -24,7 +24,7 @@ type Redis struct {
 // Packet defines the redis consumed messages
 type Packet struct {
 	Message map[string]interface{}
-	Id string
+	Id      string
 }
 
 type Options struct {
@@ -51,7 +51,7 @@ type Options struct {
 	TLSConfig          *tls.Config
 	Limiter            redis.Limiter
 	LogLevel           string
-	LogFilePath		   string
+	LogFilePath        string
 }
 
 // NewRdb initializes a new Redis instance and establishes a
@@ -62,10 +62,10 @@ func NewRdb(ctx context.Context, opts Options) *Redis {
 		opts.LogLevel = "panic"
 	}
 	rdbOpts := &redis.Options{
-		Addr: opts.Addr,
-		PoolSize: opts.PoolSize,
-		ReadTimeout: 5 * time.Second,
-		MaxRetries: 3,
+		Addr:         opts.Addr,
+		PoolSize:     opts.PoolSize,
+		ReadTimeout:  5 * time.Second,
+		MaxRetries:   3,
 		WriteTimeout: 5 * time.Second,
 		MinIdleConns: 3,
 	}
@@ -75,13 +75,13 @@ func NewRdb(ctx context.Context, opts Options) *Redis {
 	rdb := redis.NewClient(rdbOpts)
 	return &Redis{
 		RdbCon: rdb.Conn(ctx),
-		Ctx: ctx,
-		Log: log,
+		Ctx:    ctx,
+		Log:    log,
 	}
 }
 
 // Close closes the redis connection when called
-func (r *Redis) Close()  {
+func (r *Redis) Close() {
 	r.RdbCon.Close()
 }
 
@@ -100,9 +100,9 @@ func (r *Redis) Get(key string) (string, error) {
 // Produce will push the message to stream for the consumers
 func (r *Redis) Produce(qName string, msg string) (string, error) {
 	args := &redis.XAddArgs{
-		Stream:       qName,
-		Values:       map[string]string{ "message": msg },
-		ID: 		  "*",
+		Stream: qName,
+		Values: map[string]string{"message": msg},
+		ID:     "*",
 	}
 	xadd := r.RdbCon.XAdd(r.Ctx, args)
 	res, err := xadd.Result()
@@ -126,12 +126,12 @@ func (r *Redis) Consume(q, name string, block time.Duration) ([]byte, string, er
 	}
 	grp := q + DefaultConsumerGrpSuf
 	args := redis.XReadGroupArgs{
-		Group:     grp,
-		Consumer:  name,
-		Streams:   []string{q, "0"},
-		Count:     1,
-		NoAck:     false,
-		Block:     block,
+		Group:    grp,
+		Consumer: name,
+		Streams:  []string{q, "0"},
+		Count:    1,
+		NoAck:    false,
+		Block:    block,
 	}
 	res, err := r.RdbCon.XReadGroup(r.Ctx, &args).Result()
 	if err != nil {
@@ -142,7 +142,7 @@ func (r *Redis) Consume(q, name string, block time.Duration) ([]byte, string, er
 	if err == nil && byts != nil {
 		return byts, id, err
 	}
-	args.Streams = []string{ q, ">" }
+	args.Streams = []string{q, ">"}
 	res, err = r.RdbCon.XReadGroup(r.Ctx, &args).Result()
 	if err != nil {
 		return nil, "", err
@@ -159,12 +159,11 @@ func (r *Redis) formatConsumeMsg(res []redis.XStream) ([]byte, string, error) {
 	return nil, "", fmt.Errorf("redis returned empty messages - %+v", res)
 }
 
-
 // Ack used to acknowledge a message upon successful
 // consumption if the message is not ack it will go
 // into pending state where it will be reschedule to
 // other consumers through syncConsumers
-func (r *Redis) Ack(q string, msgId... string) error {
+func (r *Redis) Ack(q string, msgId ...string) error {
 	grp := q + DefaultConsumerGrpSuf
 	xack := r.RdbCon.XAck(r.Ctx, q, grp, msgId...)
 	res, err := xack.Result()
@@ -205,7 +204,7 @@ func (r *Redis) CreateGrp(q string, persistent bool, start string) error {
 	grp := q + DefaultConsumerGrpSuf
 	exists, err := r.GrpExists(q)
 	if err != nil || !exists {
-		cmd := r.RdbCon.XGroupCreateMkStream(r.Ctx, q, grp,  start)
+		cmd := r.RdbCon.XGroupCreateMkStream(r.Ctx, q, grp, start)
 		sts, err := cmd.Result()
 		if err != nil {
 			return err
@@ -230,7 +229,7 @@ func (r *Redis) DeleteGrp(q string) error {
 // StreamExists checks if a stream with given name Exists or not
 func (r *Redis) StreamExists(q string) bool {
 	cmd := r.RdbCon.ScanType(r.Ctx, 0, "", 0, "stream")
-	sts, _,  err := cmd.Result()
+	sts, _, err := cmd.Result()
 	if err != nil {
 		r.Log.Errorf("failed to get stream '%s', error : %s", q, err.Error())
 		return false
@@ -278,12 +277,12 @@ func (r *Redis) DeleteQ(q string) error {
 func (r *Redis) PendingStreamMessages(q string, idleTime time.Duration) (map[string][]string, int, error) {
 	grp := q + DefaultConsumerGrpSuf
 	args := redis.XPendingExtArgs{
-		Stream:   q,
-		Group:    grp,
-		Start:    "-",
-		End:      "+",
-		Count:    10,
-		Idle:     idleTime,
+		Stream: q,
+		Group:  grp,
+		Start:  "-",
+		End:    "+",
+		Count:  10,
+		Idle:   idleTime,
 	}
 	cmd := r.RdbCon.XPendingExt(r.Ctx, &args)
 	pending, err := cmd.Result()
@@ -301,7 +300,7 @@ func (r *Redis) PendingStreamMessages(q string, idleTime time.Duration) (map[str
 	return res, msgCount, nil
 }
 
-func (r *Redis) ClaimPendingMessages(q, consumer string, msgIdleTime time.Duration) error  {
+func (r *Redis) ClaimPendingMessages(q, consumer string, msgIdleTime time.Duration) error {
 	msgs, _, err := r.PendingStreamMessages(q, msgIdleTime)
 	if err != nil {
 		r.Log.Errorf("failed to fetch pending messages { q: %s, consumer: %s, error: %s}", q, consumer, err.Error())
@@ -341,20 +340,6 @@ func (r *Redis) GetQStats(opts QStatusOptions) (QStatus, error) {
 		status.Consumers = r.getConsumerInfo(opts.Q)
 	}
 	return status, nil
-}
-
-func (r *Redis) addX(q string, msg interface{}) (string, error) {
-	args := &redis.XAddArgs{
-		Stream:       q,
-		Values:       msg,
-	}
-	xadd := r.RdbCon.XAdd(r.Ctx, args)
-	res, err := xadd.Result()
-	if err != nil {
-		return "", err
-	}
-	r.Log.Debugf("claim message refreshed for stream %s - res : %s", msg, res)
-	return res, nil
 }
 
 func (r *Redis) getConsumerInfo(q string) []Consumer {
@@ -404,13 +389,13 @@ func (r *Redis) getStreamInfo(q string) (Info, error) {
 	}, nil
 }
 
-func (r *Redis) claimMessages(q,  consumer string, msgId... string) error {
+func (r *Redis) claimMessages(q, consumer string, msgId ...string) error {
 	grp := q + DefaultConsumerGrpSuf
 	args := &redis.XClaimArgs{
-		Stream:    q,
-		Group:     grp,
-		Consumer:  consumer,
-		Messages:  msgId,
+		Stream:   q,
+		Group:    grp,
+		Consumer: consumer,
+		Messages: msgId,
 	}
 	cmd := r.RdbCon.XClaim(r.Ctx, args)
 	msg, err := cmd.Result()
